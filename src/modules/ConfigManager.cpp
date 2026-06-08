@@ -52,6 +52,8 @@ bool ConfigManager::loadConfig() {
     if (json.contains("bouyomiExePath")) m_bouyomiExePath = json["bouyomiExePath"].toString();
     if (json.contains("bouyomiVoice")) m_bouyomiVoice = json["bouyomiVoice"].toInt();
     if (json.contains("bouyomiVolume")) m_bouyomiVolume = json["bouyomiVolume"].toInt();
+    if (json.contains("bouyomiAutoStart")) m_bouyomiAutoStart = json["bouyomiAutoStart"].toBool();
+    if (json.contains("bouyomiAutoStop")) m_bouyomiAutoStop = json["bouyomiAutoStop"].toBool();
 
     // 保存されているトークンがあれば読み込む
     loadToken();
@@ -76,6 +78,8 @@ void ConfigManager::saveConfig() {
     json["bouyomiExePath"] = m_bouyomiExePath;
     json["bouyomiVoice"] = m_bouyomiVoice;
     json["bouyomiVolume"] = m_bouyomiVolume;
+    json["bouyomiAutoStart"] = m_bouyomiAutoStart;
+    json["bouyomiAutoStop"] = m_bouyomiAutoStop;
 
     QJsonDocument doc(json);
     file.write(doc.toJson());

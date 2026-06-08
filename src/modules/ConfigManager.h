@@ -34,6 +34,12 @@ public:
     
     int bouyomiVolume() const { return m_bouyomiVolume; }
     void setBouyomiVolume(int volume) { m_bouyomiVolume = volume; }
+    
+    bool bouyomiAutoStart() const { return m_bouyomiAutoStart; }
+    void setBouyomiAutoStart(bool autoStart) { m_bouyomiAutoStart = autoStart; }
+    
+    bool bouyomiAutoStop() const { return m_bouyomiAutoStop; }
+    void setBouyomiAutoStop(bool autoStop) { m_bouyomiAutoStop = autoStop; }
 
     void saveConfig(); // 設定保存用メソッド
 
@@ -57,7 +63,9 @@ private:
     int m_bouyomiPort = 50001;
     QString m_bouyomiExePath = "";
     int m_bouyomiVoice = 0;
-    int m_bouyomiVolume = -1;
+    int m_bouyomiVolume = 100;
+    bool m_bouyomiAutoStart = false;
+    bool m_bouyomiAutoStop = false;
 
     QTcpServer* m_httpServer;
 

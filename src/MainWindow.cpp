@@ -54,6 +54,8 @@ void MainWindow::setConfigManager(ConfigManager* configManager) {
     }
     
     ui->spinBouyomiVolume->setValue(m_configManager->bouyomiVolume());
+    ui->chkBouyomiAutoStart->setChecked(m_configManager->bouyomiAutoStart());
+    ui->chkBouyomiAutoStop->setChecked(m_configManager->bouyomiAutoStop());
 }
 
 void MainWindow::on_btnBrowseBouyomi_clicked() {
@@ -71,7 +73,17 @@ void MainWindow::on_btnSaveBouyomi_clicked() {
     m_configManager->setBouyomiExePath(ui->editBouyomiExe->text());
     m_configManager->setBouyomiVoice(ui->comboBouyomiVoice->currentIndex());
     m_configManager->setBouyomiVolume(ui->spinBouyomiVolume->value());
+    m_configManager->setBouyomiAutoStart(ui->chkBouyomiAutoStart->isChecked());
+    m_configManager->setBouyomiAutoStop(ui->chkBouyomiAutoStop->isChecked());
     
     m_configManager->saveConfig();
     QMessageBox::information(this, "設定保存", "棒読みちゃんの設定を保存しました。");
+}
+
+void MainWindow::on_btnTestBouyomi_clicked() {
+    QString testMessage = ui->editBouyomiTestText->text();
+    if (testMessage.isEmpty()) {
+        testMessage = "これはテストメッセージです";
+    }
+    emit bouyomiTestRequested(testMessage);
 }

@@ -4,11 +4,16 @@
 #include <QDebug>
 
 BouyomiIntegrationImpl::BouyomiIntegrationImpl(ConfigManager* config, QObject* parent)
-    : QObject(parent), m_config(config)
+    : QObject(parent), m_config(config), m_process(new QProcess(this))
 {
 }
 
 BouyomiIntegrationImpl::~BouyomiIntegrationImpl() {
+    stopProcess();
+}
+
+void BouyomiIntegrationImpl::initialize() {
+    checkAndStartProcess();
 }
 
 void BouyomiIntegrationImpl::sendText(const QString& text) {
@@ -53,4 +58,30 @@ void BouyomiIntegrationImpl::sendText(const QString& text) {
     QString host = m_config ? m_config->bouyomiHost() : "127.0.0.1";
     int port = m_config ? m_config->bouyomiPort() : 50001;
     socket->connectToHost(host, port);
+}
+
+void BouyomiIntegrationImpl::checkAndStartProcess() {
+    if (!m_config) return;
+    if (!m_config->bouyomiAutoStart()) return;
+    
+    QString exePath = m_config->bouyomiExePath();
+    if (exePath.isEmpty()) return;
+    
+    if (m_process->state() == QProcess::NotRunning) {
+        qInfo() << "Starting Bouyomi-chan:" << exePath;
+        m_process->start(exePath, QStringList());
+    }
+}
+
+void BouyomiIntegrationImpl::stopProcess() {
+    if (!m_config) return;
+    if (!m_config->bouyomiAutoStop()) return;
+    
+    if (m_process->state() != QProcess::NotRunning) {
+        qInfo() << "Stopping Bouyomi-chan...";
+        m_process->terminate();
+        if (!m_process->waitForFinished(3000)) {
+            m_process->kill();
+        }
+    }
 }

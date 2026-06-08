@@ -123,11 +123,45 @@
             <widget class="QSpinBox" name="spinBouyomiVolume">
              <property name="minimum"><number>-1</number></property>
              <property name="maximum"><number>100</number></property>
-             <property name="value"><number>-1</number></property>
+             <property name="value"><number>100</number></property>
              <property name="specialValueText"><string>デフォルト</string></property>
             </widget>
            </item>
+           <item row="5" column="0">
+            <widget class="QLabel" name="labelAutoStart">
+             <property name="text"><string>連動起動:</string></property>
+            </widget>
+           </item>
            <item row="5" column="1">
+            <widget class="QCheckBox" name="chkBouyomiAutoStart">
+             <property name="text"><string>起動時に棒読みちゃんを自動起動する</string></property>
+            </widget>
+           </item>
+           <item row="6" column="1">
+            <widget class="QCheckBox" name="chkBouyomiAutoStop">
+             <property name="text"><string>終了時に棒読みちゃんを自動終了する</string></property>
+            </widget>
+           </item>
+           <item row="7" column="0">
+            <widget class="QLabel" name="labelTest">
+             <property name="text"><string>テスト送信:</string></property>
+            </widget>
+           </item>
+           <item row="7" column="1">
+            <layout class="QHBoxLayout" name="horizontalLayoutTest">
+             <item>
+              <widget class="QLineEdit" name="editBouyomiTestText">
+               <property name="placeholderText"><string>テスト用メッセージ</string></property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnTestBouyomi">
+               <property name="text"><string>テスト送信</string></property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item row="8" column="1">
             <widget class="QPushButton" name="btnSaveBouyomi">
              <property name="text"><string>設定を保存</string></property>
             </widget>

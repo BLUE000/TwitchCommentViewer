@@ -24,11 +24,13 @@ public:
 signals:
     // 設定タブで認証ボタンが押されたことを通知
     void authRequested();
+    void bouyomiTestRequested(const QString& message);
 
 private slots:
     void on_btnStartAuth_clicked();
     void on_btnBrowseBouyomi_clicked();
     void on_btnSaveBouyomi_clicked();
+    void on_btnTestBouyomi_clicked();
 
 private:
     Ui::MainWindow *ui;

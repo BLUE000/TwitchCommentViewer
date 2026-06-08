@@ -26,6 +26,10 @@ void AppController::initialize() {
 
     // 設定を読み込み、OAuth認証を開始。成功したらTwitchへ接続。
     if (m_configManager->loadConfig()) {
+        if (m_bouyomiIntegration) {
+            m_bouyomiIntegration->initialize();
+        }
+
         connect(m_configManager.get(), &ConfigManager::authCompleted, this, [this](bool success, const QString& errorMsg) {
             if (success) {
                 qInfo() << "OAuth Flow Successful. Proceeding to connect Twitch EventSub...";
@@ -47,6 +51,13 @@ void AppController::initialize() {
             connect(m_mainWindow, &MainWindow::authRequested, this, [this]() {
                 qInfo() << "Auth requested from UI. Starting OAuth Flow...";
                 m_configManager->startOAuthFlow();
+            });
+
+            connect(m_mainWindow, &MainWindow::bouyomiTestRequested, this, [this](const QString& message) {
+                qInfo() << "Bouyomi test requested:" << message;
+                if (m_bouyomiIntegration) {
+                    m_bouyomiIntegration->sendText(message);
+                }
             });
         }
     } else {
