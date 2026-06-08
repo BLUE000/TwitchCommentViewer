@@ -63,21 +63,16 @@ TwitchCommentManagerは、Twitch配信者向けの多機能コメント管理ツ
 本ソフトウェアは、以下の独自のセキュリティ/暗号化コンポーネントおよびオープンソースライブラリを利用して開発されています。
 
 **TwitchCommentManager**
-Copyright (C) 2026 BLUE000
-
-**TrustChain** (Build verification & Watermarking component)
 Copyright (c) 2026 BLUE000
-(MIT License)
 
-**TransCipher** (Data encryption component)
-Copyright (c) 2026 BLUE000. All rights reserved.
-(TransCipher Software License)
+### サードパーティ・ライセンス
 
-**BinMarkManager** (Binary integrity management component)
-Copyright (c) 2026 BLUE
-(MIT License)
+本ソフトウェアは、以下のオープンソースライブラリおよびセキュリティモジュールを利用しています。
 
-**Qt 6**
-本ソフトウェアは Qt 6 ライブラリを使用しています。
-Copyright (C) The Qt Company Ltd and other contributors.
-Qt is available under the GNU Lesser General Public License (LGPL) version 3 or the GNU General Public License (GPL) version 2 or version 3.
+This software uses TrustChain Module. Copyright (c) 2026 BLUE000.
+Includes TransCipher, Copyright (c) 2026 BLUE000. (https://github.com/BLUE000/TransCipher-Dist)
+Includes BinMarkManager, Copyright (c) 2026 BLUE000. (https://github.com/BLUE000/BinMarkManager)
+
+Qt is licensed under the GNU Lesser General Public License (LGPL) version 3.
+Copyright (C) 2024 The Qt Company Ltd and other contributors.
+(https://www.qt.io/licensing/)
