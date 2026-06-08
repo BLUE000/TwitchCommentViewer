@@ -26,6 +26,11 @@ void AppController::initialize() {
         connect(m_configManager.get(), &ConfigManager::authCompleted, this, [this](bool success, const QString& errorMsg) {
             if (success) {
                 qInfo() << "OAuth Flow Successful. Proceeding to connect Twitch EventSub...";
+                // 認証情報をコレクターへ渡す
+                auto* impl = dynamic_cast<TwitchEventCollectorImpl*>(m_twitchCollector.get());
+                if (impl) {
+                    impl->setAuthData(m_configManager->getClientId(), m_configManager->getAccessToken());
+                }
                 m_twitchCollector->connectToTwitch();
             } else {
                 qWarning() << "OAuth Authentication Failed:" << errorMsg;
@@ -36,6 +41,15 @@ void AppController::initialize() {
         m_configManager->startOAuthFlow();
     } else {
         qWarning() << "config.json could not be loaded. Missing Client ID.";
+    }
+
+    // 既にトークンが保存されていて有効なら自動接続するフロー
+    if (!m_configManager->getAccessToken().isEmpty()) {
+        auto* impl = dynamic_cast<TwitchEventCollectorImpl*>(m_twitchCollector.get());
+        if (impl) {
+            impl->setAuthData(m_configManager->getClientId(), m_configManager->getAccessToken());
+        }
+        m_twitchCollector->connectToTwitch();
     }
 }
 

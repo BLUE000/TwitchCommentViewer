@@ -2,6 +2,10 @@
 #include "../events/TwitchEvents.h"
 #include <QCoreApplication>
 #include <QDebug>
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QNetworkReply>
+#include <QJsonArray>
 
 TwitchEventCollectorImpl::TwitchEventCollectorImpl(QObject* eventTarget, QObject* parent)
     : QObject(parent), m_eventTarget(eventTarget)
@@ -18,6 +22,10 @@ TwitchEventCollectorImpl::~TwitchEventCollectorImpl() {
 }
 
 void TwitchEventCollectorImpl::connectToTwitch() {
+    if (m_clientId.isEmpty() || m_accessToken.isEmpty()) {
+        qWarning() << "Cannot connect to Twitch EventSub: Missing Auth Data.";
+        return;
+    }
     // Twitch EventSub WebSockets の接続先URL
     QUrl url("wss://eventsub.wss.twitch.tv/ws");
     qInfo() << "Connecting to Twitch EventSub (WebSocket)...";
@@ -29,6 +37,11 @@ void TwitchEventCollectorImpl::disconnectFromTwitch() {
         m_webSocket.close();
         qInfo() << "Disconnected from Twitch EventSub.";
     }
+}
+
+void TwitchEventCollectorImpl::setAuthData(const QString& clientId, const QString& accessToken) {
+    m_clientId = clientId;
+    m_accessToken = accessToken;
 }
 
 void TwitchEventCollectorImpl::onConnected() {
@@ -46,10 +59,12 @@ void TwitchEventCollectorImpl::onTextMessageReceived(const QString& message) {
     QString messageType = metadata["message_type"].toString();
 
     if (messageType == "session_welcome") {
-        qInfo() << "Session Welcome received from Twitch.";
-        // QJsonObject payload = json["payload"].toObject();
-        // QString sessionId = payload["session"].toObject()["id"].toString();
-        // TODO: Subscription登録API呼び出し (TwitchActionSender経由等)
+        QJsonObject payload = json["payload"].toObject();
+        m_sessionId = payload["session"].toObject()["id"].toString();
+        qInfo() << "Session Welcome received from Twitch. Session ID:" << m_sessionId;
+        
+        // WebSocket接続が確立されたので、APIを使って購読(Subscription)をリクエストする
+        fetchBroadcasterIdAndSubscribe();
     } else if (messageType == "notification") {
         processNotification(json);
     } else if (messageType == "session_keepalive") {
@@ -82,4 +97,65 @@ void TwitchEventCollectorImpl::processNotification(const QJsonObject& json) {
 
 void TwitchEventCollectorImpl::onErrorOccurred(QAbstractSocket::SocketError error) {
     qWarning() << "WebSocket error:" << error << "-" << m_webSocket.errorString();
+}
+
+void TwitchEventCollectorImpl::fetchBroadcasterIdAndSubscribe() {
+    auto* nam = new QNetworkAccessManager(this);
+    QNetworkRequest request(QUrl("https://api.twitch.tv/helix/users"));
+    request.setRawHeader("Authorization", ("Bearer " + m_accessToken).toUtf8());
+    request.setRawHeader("Client-Id", m_clientId.toUtf8());
+
+    QNetworkReply* reply = nam->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, nam]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+            QJsonArray dataObj = doc.object()["data"].toArray();
+            if (!dataObj.isEmpty()) {
+                m_broadcasterId = dataObj[0].toObject()["id"].toString();
+                qInfo() << "Fetched Broadcaster ID:" << m_broadcasterId;
+                registerSubscription();
+            } else {
+                qWarning() << "No user data found.";
+            }
+        } else {
+            qWarning() << "Failed to fetch user data:" << reply->errorString() << reply->readAll();
+        }
+        reply->deleteLater();
+        nam->deleteLater();
+    });
+}
+
+void TwitchEventCollectorImpl::registerSubscription() {
+    auto* nam = new QNetworkAccessManager(this);
+    QNetworkRequest request(QUrl("https://api.twitch.tv/helix/eventsub/subscriptions"));
+    request.setRawHeader("Authorization", ("Bearer " + m_accessToken).toUtf8());
+    request.setRawHeader("Client-Id", m_clientId.toUtf8());
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+    QJsonObject condition;
+    condition["broadcaster_user_id"] = m_broadcasterId;
+    condition["user_id"] = m_broadcasterId; // For reading chat, both are the broadcaster's ID
+
+    QJsonObject transport;
+    transport["method"] = "websocket";
+    transport["session_id"] = m_sessionId;
+
+    QJsonObject payload;
+    payload["type"] = "channel.chat.message";
+    payload["version"] = "1";
+    payload["condition"] = condition;
+    payload["transport"] = transport;
+
+    QJsonDocument doc(payload);
+    QNetworkReply* reply = nam->post(request, doc.toJson());
+    
+    connect(reply, &QNetworkReply::finished, this, [reply, nam]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            qInfo() << "Successfully subscribed to channel.chat.message via WebSocket!";
+        } else {
+            qWarning() << "Subscription failed:" << reply->errorString() << reply->readAll();
+        }
+        reply->deleteLater();
+        nam->deleteLater();
+    });
 }

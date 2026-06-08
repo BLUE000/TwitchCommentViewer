@@ -14,6 +14,9 @@ public:
     void connectToTwitch() override;
     void disconnectFromTwitch() override;
 
+    // 認証情報をセットする
+    void setAuthData(const QString& clientId, const QString& accessToken);
+
 private slots:
     void onConnected();
     void onTextMessageReceived(const QString& message);
@@ -23,5 +26,12 @@ private:
     QWebSocket m_webSocket;
     QObject* m_eventTarget; // イベント送信先（AppController等のハンドラ）
     
+    QString m_clientId;
+    QString m_accessToken;
+    QString m_sessionId;
+    QString m_broadcasterId; // TwitchのユーザーID
+
     void processNotification(const QJsonObject& json);
+    void fetchBroadcasterIdAndSubscribe();
+    void registerSubscription();
 };
