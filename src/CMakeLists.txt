@@ -55,6 +55,13 @@ add_custom_command(TARGET TwitchCommentManager POST_BUILD
         "$<TARGET_FILE_DIR:TwitchCommentManager>/libTransCipher.dll"
 )
 
+# config.jsonをビルドディレクトリにコピー
+add_custom_command(TARGET TwitchCommentManager POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/config.json"
+        "$<TARGET_FILE_DIR:TwitchCommentManager>/config.json"
+)
+
 # QtのDLLとプラグイン(qwindows.dll等)をビルドディレクトリに自動コピーする
 if(WIN32)
     find_program(WINDEPLOYQT_EXECUTABLE windeployqt HINTS "${Qt6_DIR}/../../../bin" "${Qt6_DIR}/../bin")

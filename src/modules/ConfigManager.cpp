@@ -6,6 +6,7 @@
 #include <QUrl>
 #include <QUrlQuery>
 #include <QDebug>
+#include <QCoreApplication>
 #include <cipher_engine.h>
 
 ConfigManager::ConfigManager(QObject* parent) 
@@ -24,9 +25,10 @@ ConfigManager::~ConfigManager() {
 }
 
 bool ConfigManager::loadConfig() {
-    QFile file("config.json");
+    QString configPath = QCoreApplication::applicationDirPath() + "/config.json";
+    QFile file(configPath);
     if (!file.open(QIODevice::ReadOnly)) {
-        qWarning() << "Failed to open config.json. Please ensure it exists in the working directory.";
+        qWarning() << "Failed to open config.json at" << configPath;
         return false;
     }
 
@@ -161,7 +163,8 @@ void ConfigManager::saveToken(const QString& token) {
     // トークンを平文で保存するのは危険なので TransCipher で暗号化する
     CipherResult res = CipherEngine::encrypt(token.toUtf8(), m_cipherKey);
     if (res.isSuccess()) {
-        QFile file("tokens.enc");
+        QString tokenPath = QCoreApplication::applicationDirPath() + "/tokens.enc";
+        QFile file(tokenPath);
         if (file.open(QIODevice::WriteOnly)) {
             file.write(res.data());
         }
@@ -169,7 +172,8 @@ void ConfigManager::saveToken(const QString& token) {
 }
 
 bool ConfigManager::loadToken() {
-    QFile file("tokens.enc");
+    QString tokenPath = QCoreApplication::applicationDirPath() + "/tokens.enc";
+    QFile file(tokenPath);
     if (!file.open(QIODevice::ReadOnly)) {
         return false;
     }
