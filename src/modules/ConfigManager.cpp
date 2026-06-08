@@ -67,12 +67,12 @@ void ConfigManager::startOAuthFlow() {
     }
 
     // ブラウザを開いてTwitchの認証画面へ誘導 (Implicit Grant Flow)
-    // ※ EventSub のチャット取得には user:read:chat スコープが必須
+    // ※ EventSub のチャット取得には user:read:chat スコープが必須 (空白はURLエンコードが必要)
     QString authUrl = QString("https://id.twitch.tv/oauth2/authorize"
                               "?response_type=token"
                               "&client_id=%1"
                               "&redirect_uri=%2"
-                              "&scope=user:read:chat user:write:chat")
+                              "&scope=user:read:chat%20user:write:chat")
                           .arg(m_clientId)
                           .arg(m_redirectUri);
                           
