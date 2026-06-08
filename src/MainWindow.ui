@@ -34,11 +34,38 @@
        <attribute name="title">
         <string>解析</string>
        </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_3">
+        <item>
+         <widget class="QTextBrowser" name="textBrowserAnalysis"/>
+        </item>
+       </layout>
       </widget>
       <widget class="QWidget" name="tabSettings">
        <attribute name="title">
         <string>設定</string>
        </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_4">
+        <item>
+         <widget class="QPushButton" name="btnStartAuth">
+          <property name="text">
+           <string>Twitch 連携を開始 (OAuth認証)</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="verticalSpacer">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>40</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
       </widget>
      </widget>
     </item>
