@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <ui version="4.0">
  <class>ViewerMainWindow</class>
  <widget class="QMainWindow" name="ViewerMainWindow">
@@ -40,11 +40,11 @@
      </layout>
     </item>
     <item>
-     <widget class="QTableView" name="tableView"/>
+     <widget class="QTableView" name="tableView" />
     </item>
-   </layout>
+   <item><layout class="QHBoxLayout" name="horizontalLayout_del"><item><spacer name="horizontalSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item><item><widget class="QPushButton" name="btnDeleteSelected"><property name="text"><string>選択行を削除</string></property></widget></item><item><widget class="QPushButton" name="btnDeleteAll"><property name="text"><string>全件削除</string></property></widget></item></layout></item></layout>
   </widget>
  </widget>
- <resources/>
- <connections/>
+ <resources />
+ <connections />
 </ui>

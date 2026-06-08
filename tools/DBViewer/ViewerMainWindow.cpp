@@ -9,10 +9,11 @@
 #include <cipher_engine.h>
 #include <QDebug>
 
-ViewerMainWindow::ViewerMainWindow(QWidget *parent)
+ViewerMainWindow::ViewerMainWindow(const QString& dbPath, QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::ViewerMainWindow)
     , m_model(new QStandardItemModel(this))
+    , m_dbPath(dbPath)
 {
     ui->setupUi(this);
 
@@ -22,6 +23,8 @@ ViewerMainWindow::ViewerMainWindow(QWidget *parent)
     });
     ui->tableView->setModel(m_model);
     ui->tableView->horizontalHeader()->setStretchLastSection(true);
+    ui->tableView->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    ui->tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
 
     // 起動時にロード
     loadDatabase();
@@ -38,7 +41,10 @@ void ViewerMainWindow::on_btnReload_clicked() {
 void ViewerMainWindow::loadDatabase() {
     m_model->removeRows(0, m_model->rowCount());
 
-    QString dbPath = QCoreApplication::applicationDirPath() + "/twitch_comments.db";
+    QString dbPath = m_dbPath;
+    if (dbPath.isEmpty()) {
+        dbPath = QCoreApplication::applicationDirPath() + "/twitch_comments.db";
+    }
     const QString DB_CONNECTION_NAME = "DBViewerConnection";
     const QString RUNTIME_KEY = "application_runtime_key"; // 固定キー
 
@@ -56,19 +62,20 @@ void ViewerMainWindow::loadDatabase() {
     }
 
     QSqlQuery query(db);
-    if (!query.exec("SELECT timestamp, user_id, username_enc, message_enc, emotion_score, is_spam FROM chat_logs ORDER BY timestamp DESC")) {
+    if (!query.exec("SELECT id, timestamp, user_id, username_enc, message_enc, sentiment_score, is_spam FROM chat_logs ORDER BY timestamp DESC")) {
         QMessageBox::warning(this, "エラー", "テーブルからの読み込みに失敗しました。\n" + query.lastError().text());
         db.close();
         return;
     }
 
     while (query.next()) {
-        qint64 ts = query.value(0).toLongLong();
-        QString userId = query.value(1).toString();
-        QByteArray usernameEnc = query.value(2).toByteArray();
-        QByteArray messageEnc = query.value(3).toByteArray();
-        double emotionScore = query.value(4).toDouble();
-        bool isSpam = query.value(5).toBool();
+        qint64 id = query.value(0).toLongLong();
+        qint64 ts = query.value(1).toLongLong();
+        QString userId = query.value(2).toString();
+        QByteArray usernameEnc = query.value(3).toByteArray();
+        QByteArray messageEnc = query.value(4).toByteArray();
+        double emotionScore = query.value(5).toDouble();
+        bool isSpam = query.value(6).toBool();
 
         // 復号処理
         CipherResult resUser = CipherEngine::decrypt(usernameEnc, RUNTIME_KEY);
@@ -80,7 +87,9 @@ void ViewerMainWindow::loadDatabase() {
         QString timeStr = QDateTime::fromMSecsSinceEpoch(ts).toString("yyyy/MM/dd HH:mm:ss");
 
         QList<QStandardItem*> row;
-        row << new QStandardItem(timeStr);
+        QStandardItem* timeItem = new QStandardItem(timeStr);
+        timeItem->setData(id, Qt::UserRole); // store ID in UserRole
+        row << timeItem;
         row << new QStandardItem(userId);
         row << new QStandardItem(username);
         row << new QStandardItem(message);
@@ -92,4 +101,68 @@ void ViewerMainWindow::loadDatabase() {
 
     db.close();
     ui->tableView->resizeColumnsToContents();
+}
+
+void ViewerMainWindow::on_btnDeleteSelected_clicked() {
+    QModelIndexList selected = ui->tableView->selectionModel()->selectedRows();
+    if (selected.isEmpty()) {
+        QMessageBox::information(this, "通知", "削除する行を選択してください。");
+        return;
+    }
+
+    if (QMessageBox::question(this, "確認", QString("%1件のコメントを削除しますか？").arg(selected.size())) != QMessageBox::Yes) {
+        return;
+    }
+
+    QString dbPath = m_dbPath.isEmpty() ? QCoreApplication::applicationDirPath() + "/twitch_comments.db" : m_dbPath;
+    QSqlDatabase db = QSqlDatabase::database("DBViewerConnection");
+    if (!db.isOpen()) {
+        db = QSqlDatabase::addDatabase("QSQLITE", "DBViewerConnection");
+        db.setDatabaseName(dbPath);
+        if (!db.open()) return;
+    }
+
+    QSqlQuery query(db);
+    db.transaction();
+    bool success = true;
+    for (const QModelIndex& index : selected) {
+        qint64 id = m_model->item(index.row(), 0)->data(Qt::UserRole).toLongLong();
+        query.prepare("DELETE FROM chat_logs WHERE id = :id");
+        query.bindValue(":id", id);
+        if (!query.exec()) {
+            success = false;
+            break;
+        }
+    }
+
+    if (success) {
+        db.commit();
+        QMessageBox::information(this, "成功", "選択したコメントを削除しました。");
+        loadDatabase();
+    } else {
+        db.rollback();
+        QMessageBox::warning(this, "エラー", "削除中にエラーが発生しました。\n" + query.lastError().text());
+    }
+}
+
+void ViewerMainWindow::on_btnDeleteAll_clicked() {
+    if (QMessageBox::question(this, "確認", "すべてのコメント履歴を削除しますか？\nこの操作は元に戻せません。", QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes) {
+        return;
+    }
+
+    QString dbPath = m_dbPath.isEmpty() ? QCoreApplication::applicationDirPath() + "/twitch_comments.db" : m_dbPath;
+    QSqlDatabase db = QSqlDatabase::database("DBViewerConnection");
+    if (!db.isOpen()) {
+        db = QSqlDatabase::addDatabase("QSQLITE", "DBViewerConnection");
+        db.setDatabaseName(dbPath);
+        if (!db.open()) return;
+    }
+
+    QSqlQuery query(db);
+    if (query.exec("DELETE FROM chat_logs")) {
+        QMessageBox::information(this, "成功", "すべてのコメント履歴を削除しました。");
+        loadDatabase();
+    } else {
+        QMessageBox::warning(this, "エラー", "削除中にエラーが発生しました。\n" + query.lastError().text());
+    }
 }

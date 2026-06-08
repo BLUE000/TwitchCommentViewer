@@ -52,6 +52,10 @@ public:
     QString getObsOverlayFile() const;
     void setObsOverlayFile(const QString& filename);
 
+    // ボットユーザー設定
+    QStringList getBotUsers() const;
+    void setBotUsers(const QStringList& bots);
+
     // 認証情報
     void saveConfig(); // 設定保存用メソッド
 
@@ -83,6 +87,8 @@ private:
     bool m_obsWebSocketEnabled = false;
     int m_obsServerPort = 8081;
     QString m_obsOverlayFile = "overlay.html";
+
+    QStringList m_botUsers;
 
     QTcpServer* m_httpServer;
 

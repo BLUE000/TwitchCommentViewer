@@ -1,8 +1,12 @@
 #include "CommentAnalyzer.h"
 #include <QDebug>
 
-CommentAnalyzer::CommentAnalyzer(QObject* parent) : QObject(parent) {
+CommentAnalyzer::CommentAnalyzer(QObject* parent) : QObject(parent), m_totalComments(0) {
     initDictionaries();
+}
+
+void CommentAnalyzer::setBotUsers(const QStringList& bots) {
+    m_botUsers = bots;
 }
 
 void CommentAnalyzer::initDictionaries() {
@@ -35,8 +39,20 @@ void CommentAnalyzer::initDictionaries() {
 void CommentAnalyzer::analyzeComment(const QString& userId, const QString& username, const QString& message) {
     if (message.isEmpty()) return;
 
-    // ユーザ発言回数のカウント
-    m_userCommentCount[userId]++;
+    // ボットユーザーのチェック（大文字小文字を区別せず比較）
+    bool isBot = false;
+    for (const QString& bot : m_botUsers) {
+        if (bot.trimmed().compare(username, Qt::CaseInsensitive) == 0) {
+            isBot = true;
+            break;
+        }
+    }
+
+    if (!isBot) {
+        m_totalComments++;
+        m_userCommentCount[username]++;
+        emit statisticsUpdated(m_totalComments, m_userCommentCount, username, QDateTime::currentDateTime());
+    }
 
     // 1. スパムチェック
     QString spamReason = checkSpam(message);

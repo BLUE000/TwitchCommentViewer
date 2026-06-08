@@ -35,3 +35,4 @@ trustchain_credentials.cmake
 *.sqlite
 *.db
 WIP_STATE.md
+*.py

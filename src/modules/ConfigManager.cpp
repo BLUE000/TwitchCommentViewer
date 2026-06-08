@@ -7,6 +7,8 @@
 #include <QUrlQuery>
 #include <QDebug>
 #include <QCoreApplication>
+#include <QDesktopServices>
+#include <QJsonArray>
 #include <cipher_engine.h>
 
 ConfigManager::ConfigManager(QObject* parent) 
@@ -71,6 +73,16 @@ bool ConfigManager::loadConfig() {
         m_obsOverlayFile = json["obs_overlay_file"].toString("overlay.html");
     }
 
+    if (json.contains("bot_users") && json["bot_users"].isArray()) {
+        QJsonArray botArray = json["bot_users"].toArray();
+        m_botUsers.clear();
+        for (const QJsonValue& val : botArray) {
+            if (val.isString()) {
+                m_botUsers.append(val.toString());
+            }
+        }
+    }
+
     // 認証情報の復号化と読み込み
     loadToken();
 
@@ -103,6 +115,12 @@ void ConfigManager::saveConfig() {
     rootObj["obs_websocket"] = m_obsWebSocketEnabled;
     rootObj["obs_server_port"] = m_obsServerPort;
     rootObj["obs_overlay_file"] = m_obsOverlayFile;
+
+    QJsonArray botArray;
+    for (const QString& bot : m_botUsers) {
+        botArray.append(bot);
+    }
+    rootObj["bot_users"] = botArray;
 
     // トークン情報の暗号化と保存
     QJsonDocument doc(rootObj);
@@ -281,6 +299,14 @@ QString ConfigManager::getObsOverlayFile() const {
 
 void ConfigManager::setObsOverlayFile(const QString& filename) {
     m_obsOverlayFile = filename;
+}
+
+QStringList ConfigManager::getBotUsers() const {
+    return m_botUsers;
+}
+
+void ConfigManager::setBotUsers(const QStringList& bots) {
+    m_botUsers = bots;
 }
 
 bool ConfigManager::loadToken() {

@@ -48,6 +48,7 @@ target_link_libraries(TwitchCommentManager PRIVATE
     Qt6::Network
     Qt6::Sql
     Qt6::WebSockets
+    Qt6::Charts
     trustchain
     TransCipher
 )

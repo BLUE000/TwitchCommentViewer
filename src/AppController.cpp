@@ -22,12 +22,20 @@ AppController::AppController(QObject* parent) : QObject(parent) {
     m_obsWsIntegration = nullptr; // 後でポートを取得してから初期化
     m_obsHttpServer = std::make_unique<ObsHttpServer>(this);
     
-    // コメントアナライザーの初期化とシグナル接続
-    auto analyzer = std::make_unique<CommentAnalyzer>(this);
-    connect(analyzer.get(), &CommentAnalyzer::spamDetected, this, &AppController::emitSpamDetected);
-    connect(analyzer.get(), &CommentAnalyzer::trendWordDetected, this, &AppController::emitTrendWordDetected);
-    connect(analyzer.get(), &CommentAnalyzer::emotionScored, this, &AppController::emitEmotionScored);
-    m_commentAnalyzer = std::move(analyzer);
+    // CommentAnalyzerの初期化とシグナル接続
+    auto analyzer = new CommentAnalyzer(this);
+    analyzer->setBotUsers(m_configManager->getBotUsers());
+    
+    connect(analyzer, &CommentAnalyzer::spamDetected,
+            this, &AppController::emitSpamDetected);
+    connect(analyzer, &CommentAnalyzer::trendWordDetected,
+            this, &AppController::emitTrendWordDetected);
+    connect(analyzer, &CommentAnalyzer::emotionScored,
+            this, &AppController::emitEmotionScored);
+    connect(analyzer, &CommentAnalyzer::statisticsUpdated,
+            this, &AppController::emitStatisticsUpdated);
+            
+    m_commentAnalyzer.reset(analyzer);
 }
 
 AppController::~AppController() {
@@ -35,8 +43,9 @@ AppController::~AppController() {
 }
 
 void AppController::initialize() {
-    // DBの初期化 (本来は設定から鍵を取得)
-    if (!m_dbManager->initialize("twitch_comments.db", "application_runtime_key")) {
+    // DBの初期化 (実行ファイルと同じ階層に作成)
+    QString dbPath = QCoreApplication::applicationDirPath() + "/twitch_comments.db";
+    if (!m_dbManager->initialize(dbPath, "application_runtime_key")) {
         qWarning() << "Failed to initialize DBManager in AppController";
     }
 
@@ -85,11 +94,15 @@ void AppController::initialize() {
             });
 
             connect(m_mainWindow, &MainWindow::bouyomiTestRequested, this, [this](const QString& message) {
-                qInfo() << "Bouyomi test requested:" << message;
                 if (m_bouyomiIntegration) {
                     m_bouyomiIntegration->sendText(message);
                 }
             });
+            connect(m_mainWindow, &MainWindow::botSettingsChanged, this, &AppController::updateBotUsers);
+            
+            // MainWindowへDB参照を渡し、履歴をロード
+            m_mainWindow->setDatabaseManager(m_dbManager.get());
+            m_mainWindow->loadHistoryFromDb();
         }
     } else {
         qWarning() << "config.json could not be loaded. Missing Client ID.";
@@ -178,5 +191,22 @@ void AppController::emitEmotionScored(const QString& username, const QString& me
         QString emotion = score > 0 ? "Positive" : "Negative";
         QMetaObject::invokeMethod(m_mainWindow, "appendAnalysisLog", Qt::QueuedConnection,
                                   Q_ARG(QString, QString("[%1: %2] %3: %4").arg(emotion).arg(score, 0, 'f', 2).arg(username, message)));
+    }
+}
+
+void AppController::updateBotUsers(const QStringList& bots) {
+    if (m_commentAnalyzer) {
+        auto analyzer = dynamic_cast<CommentAnalyzer*>(m_commentAnalyzer.get());
+        if (analyzer) {
+            analyzer->setBotUsers(bots);
+        }
+    }
+}
+
+void AppController::emitStatisticsUpdated(int totalComments, const QMap<QString, int>& userCounts, const QString& latestUser, const QDateTime& latestTime) {
+    if (m_mainWindow) {
+        QMetaObject::invokeMethod(m_mainWindow, [this, totalComments, userCounts, latestUser, latestTime]() {
+            if (m_mainWindow) m_mainWindow->updateStatistics(totalComments, userCounts, latestUser, latestTime);
+        }, Qt::QueuedConnection);
     }
 }

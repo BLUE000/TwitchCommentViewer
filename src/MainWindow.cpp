@@ -1,11 +1,21 @@
 #include "MainWindow.h"
 #include "ui_MainWindow.h"
 #include "modules/ConfigManager.h"
+
+#include "modules/DatabaseManager.h"
+#include <QtCharts/QChartView>
+#include <QtCharts/QLineSeries>
+#include <QtCharts/QDateTimeAxis>
+#include <QtCharts/QValueAxis>
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QDesktopServices>
 #include <QClipboard>
 #include <QUrl>
+#include <QDir>
+#include <QProcess>
+#include <QFile>
+#include <QMessageBox>
 #include <QDir>
 #include <QMessageBox>
 #include <QHBoxLayout>
@@ -33,12 +43,46 @@ MainWindow::MainWindow(QWidget *parent)
     connect(btnReadme, &QPushButton::clicked, this, &MainWindow::on_btnReadme_clicked);
     connect(btnAbout, &QPushButton::clicked, this, &MainWindow::on_btnAbout_clicked);
 
+    // ボット除外設定のトグル
+    connect(ui->btnToggleBot, &QPushButton::toggled, this, &MainWindow::on_btnToggleBot_toggled);
+    
+    // DB管理設定のトグル
+    connect(ui->btnToggleDb, &QPushButton::toggled, this, &MainWindow::on_btnToggleDb_toggled);
+
+    // 解析ログエリアのフォント設定
+    ui->textBrowserAnalysis->setStyleSheet("font-family: Consolas, monospace; font-size: 10pt;");
+    
+    // 集計テーブルの初期設定
+    ui->tableUserStats->setColumnCount(2);
+    ui->tableUserStats->setHorizontalHeaderLabels({"User", "Comments"});
+    ui->tableUserStats->horizontalHeader()->setStretchLastSection(true);
+
+    setupChart();
+    
+    // Connect chart controls
+    connect(ui->comboGraphType, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onChartConfigChanged);
+    connect(ui->comboGranularity, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onChartConfigChanged);
+    connect(ui->comboTopN, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onChartConfigChanged);
+    
+    // Timer for chart
+    m_chartUpdateTimer = new QTimer(this);
+    m_chartUpdateTimer->setInterval(5000); // 5 seconds
+    connect(m_chartUpdateTimer, &QTimer::timeout, this, &MainWindow::updateChartDisplay);
+    m_chartUpdateTimer->start();
+
+    // Bouyomi & OBS default UI states
+    ui->groupBoxBouyomi->setVisible(true);
+    ui->tableUserStats->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    ui->tableUserStats->setSelectionBehavior(QAbstractItemView::SelectRows);
+
     // ビューワタブのテーブル設定
     m_chatModel->setHeaderData(0, Qt::Horizontal, "Username");
     m_chatModel->setHeaderData(1, Qt::Horizontal, "Message");
     ui->tableViewComments->setModel(m_chatModel);
     ui->tableViewComments->setColumnWidth(0, 150);
     ui->tableViewComments->horizontalHeader()->setStretchLastSection(true);
+    ui->tableViewComments->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    ui->tableViewComments->setSelectionBehavior(QAbstractItemView::SelectRows);
 
     // ConfigManager が AppController から渡されるまでは空なので後で初期化される
 }
@@ -82,6 +126,9 @@ void MainWindow::setConfigManager(ConfigManager* configManager) {
     ui->chkObsFileOutput->setChecked(m_configManager->getObsFileOutputEnabled());
     ui->chkObsWebSocket->setChecked(m_configManager->getObsWebSocketEnabled());
     ui->spinObsPort->setValue(m_configManager->getObsServerPort());
+    
+    // ボットユーザーリスト
+    ui->editBotUsers->setText(m_configManager->getBotUsers().join(", "));
     
     loadOverlayFiles();
     int idx = ui->comboObsOverlay->findText(m_configManager->getObsOverlayFile());
@@ -163,6 +210,33 @@ void MainWindow::on_btnOpenOverlayFolder_clicked() {
     QDesktopServices::openUrl(QUrl::fromLocalFile(path));
 }
 
+void MainWindow::on_btnToggleBot_toggled(bool checked) {
+    ui->groupBoxBot->setVisible(checked);
+    ui->btnToggleBot->setText(checked ? "▼ 解析・集計設定 (ボット除外)" : "▶ 解析・集計設定 (ボット除外)");
+}
+
+void MainWindow::on_btnSaveBot_clicked() {
+    if (m_configManager) {
+        QStringList botList;
+        QString rawText = ui->editBotUsers->text();
+        for (const QString& part : rawText.split(",")) {
+            QString trimmed = part.trimmed();
+            if (!trimmed.isEmpty()) {
+                botList.append(trimmed);
+            }
+        }
+        m_configManager->setBotUsers(botList);
+        m_configManager->saveConfig();
+        emit botSettingsChanged(botList);
+        QMessageBox::information(this, "設定保存", "解析・集計設定を保存しました。");
+    }
+}
+
+void MainWindow::on_btnToggleDb_toggled(bool checked) {
+    ui->groupBoxDb->setVisible(checked);
+    ui->btnToggleDb->setText(checked ? "▼ データベース管理 (履歴表示)" : "▶ データベース管理 (履歴表示)");
+}
+
 void MainWindow::loadOverlayFiles() {
     ui->comboObsOverlay->clear();
     QString path = QCoreApplication::applicationDirPath() + "/assets/overlay";
@@ -196,4 +270,211 @@ void MainWindow::on_btnAbout_clicked() {
         "(<a href=\"https://www.qt.io/licensing/\">https://www.qt.io/licensing/</a>)</p>";
 
     QMessageBox::about(this, "About TwitchCommentManager", aboutText);
+}
+
+
+void MainWindow::updateStatistics(int totalComments, const QMap<QString, int>& userCounts, const QString& latestUser, const QDateTime& latestTime) {
+    if (!latestUser.isEmpty() && latestTime.isValid()) {
+        m_commentHistory.append({latestTime, latestUser});
+        m_chartNeedsUpdate = true;
+    }
+
+    ui->labelTotalComments->setText(QString("総コメント数: %1").arg(totalComments));
+
+    // ランキング順（降順）でソート
+    QList<QPair<QString, int>> sortedList;
+    for (auto it = userCounts.begin(); it != userCounts.end(); ++it) {
+        sortedList.append(qMakePair(it.key(), it.value()));
+    }
+    std::sort(sortedList.begin(), sortedList.end(), [](const QPair<QString, int>& a, const QPair<QString, int>& b) {
+        return a.second > b.second; // 降順
+    });
+
+    ui->tableUserStats->setRowCount(sortedList.size());
+    for (int i = 0; i < sortedList.size(); ++i) {
+        QTableWidgetItem* userItem = new QTableWidgetItem(sortedList[i].first);
+        QTableWidgetItem* countItem = new QTableWidgetItem(QString::number(sortedList[i].second));
+        countItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        
+        ui->tableUserStats->setItem(i, 0, userItem);
+        ui->tableUserStats->setItem(i, 1, countItem);
+    }
+}
+
+void MainWindow::setDatabaseManager(DatabaseManager* dbManager) {
+    m_dbManager = dbManager;
+}
+
+void MainWindow::setupChart() {
+    m_chart = new QChart();
+    m_chart->legend()->setVisible(true);
+    m_chart->legend()->setAlignment(Qt::AlignBottom);
+    
+    m_axisX = new QDateTimeAxis();
+    m_axisX->setFormat("HH:mm:ss");
+    m_axisX->setTitleText("時間");
+    m_chart->addAxis(m_axisX, Qt::AlignBottom);
+    
+    m_axisY = new QValueAxis();
+    m_axisY->setLabelFormat("%d");
+    m_axisY->setTitleText("コメント数");
+    m_chart->addAxis(m_axisY, Qt::AlignLeft);
+    
+    ui->chartView->setChart(m_chart);
+    ui->chartView->setRenderHint(QPainter::Antialiasing);
+}
+
+void MainWindow::loadHistoryFromDb() {
+    if (!m_dbManager) return;
+    
+    m_commentHistory.clear();
+    QList<CommentLog> logs = m_dbManager->getComments();
+    
+    int total = 0;
+    QMap<QString, int> userCounts;
+    
+    for (const CommentLog& log : logs) {
+        LogEntry entry;
+        entry.time = log.timestamp;
+        entry.user = log.userName;
+        m_commentHistory.append(entry);
+        
+        total++;
+        userCounts[log.userName]++;
+    }
+    
+    updateStatistics(total, userCounts);
+    m_chartNeedsUpdate = true;
+    updateChartDisplay();
+}
+
+void MainWindow::onChartConfigChanged() {
+    m_chartNeedsUpdate = true;
+    updateChartDisplay();
+}
+
+void MainWindow::on_btnLaunchDbViewer_clicked() {
+    QString exePath = QCoreApplication::applicationDirPath() + "/../tools/DBViewer/TwitchCommentDbViewer.exe";
+    if (!QFile::exists(exePath)) {
+        // Fallback for debug/release folders
+        exePath = QCoreApplication::applicationDirPath() + "/TwitchCommentDbViewer.exe";
+    }
+    
+    QString dbPath = QCoreApplication::applicationDirPath() + "/twitch_comments.db";
+    
+    QStringList args;
+    args << dbPath;
+    
+    if (!QProcess::startDetached(exePath, args)) {
+        QMessageBox::warning(this, "エラー", "データベースビューアの起動に失敗しました。\n" + exePath);
+    }
+}
+
+void MainWindow::updateChartDisplay() {
+    qDebug() << "updateChartDisplay start";
+    if (!m_chartNeedsUpdate && m_commentHistory.isEmpty()) {
+        qDebug() << "updateChartDisplay returning early (no update needed)";
+        return;
+    }
+    m_chartNeedsUpdate = false;
+    
+    qDebug() << "removing series";
+    m_chart->removeAllSeries();
+    
+    if (m_commentHistory.isEmpty()) {
+        qDebug() << "updateChartDisplay returning early (history empty)";
+        return;
+    }
+    
+    qDebug() << "calculating bounds";
+    qint64 firstTime = m_commentHistory.first().time.toMSecsSinceEpoch();
+    qint64 lastTime = m_commentHistory.last().time.toMSecsSinceEpoch();
+    qint64 durationMs = lastTime - firstTime;
+    if (durationMs < 5000) durationMs = 5000;
+    
+    // 粒度決定
+    qint64 binSizeMs = 5000; // default 5s
+    int granIdx = ui->comboGranularity->currentIndex();
+    if (granIdx == 0) { // 自動
+        binSizeMs = qMax(5000LL, durationMs / 60);
+    } else if (granIdx == 1) binSizeMs = 5000;
+    else if (granIdx == 2) binSizeMs = 10000;
+    else if (granIdx == 3) binSizeMs = 30000;
+    else if (granIdx == 4) binSizeMs = 60000;
+    else if (granIdx == 5) binSizeMs = 300000;
+    
+    int typeIdx = ui->comboGraphType->currentIndex();
+    int topNIdx = ui->comboTopN->currentIndex();
+    
+    QMap<QString, int> userTotals;
+    for (const auto& entry : m_commentHistory) {
+        userTotals[entry.user]++;
+    }
+    int uniqueUsers = userTotals.keys().size();
+    
+    // パフォーマンス保護: 100人超で全員表示の場合はTOP10にフォールバック
+    if (uniqueUsers > 100 && topNIdx == 3) {
+        topNIdx = 2; // TOP 10
+        ui->comboTopN->setCurrentIndex(2);
+    }
+    
+    QStringList targetUsers;
+    if (typeIdx == 1) { // ユーザー別
+        QList<QPair<QString, int>> sortedUsers;
+        for (auto it = userTotals.begin(); it != userTotals.end(); ++it) {
+            sortedUsers.append(qMakePair(it.key(), it.value()));
+        }
+        std::sort(sortedUsers.begin(), sortedUsers.end(), [](const auto& a, const auto& b){ return a.second > b.second; });
+        
+        int limit = sortedUsers.size();
+        if (topNIdx == 0) limit = qMin(limit, 3);
+        else if (topNIdx == 1) limit = qMin(limit, 5);
+        else if (topNIdx == 2) limit = qMin(limit, 10);
+        // topNIdx == 3 is all
+        
+        for (int i = 0; i < limit; ++i) {
+            targetUsers.append(sortedUsers[i].first);
+        }
+    }
+    
+    // データをビンに集計
+    QMap<QString, QMap<qint64, int>> binnedData; // user -> (binTime -> count)
+    // "TOTAL" key for total graph
+    qint64 maxCount = 0;
+    
+    for (const auto& entry : m_commentHistory) {
+        qint64 t = entry.time.toMSecsSinceEpoch();
+        qint64 binTime = ((t - firstTime) / binSizeMs) * binSizeMs + firstTime;
+        
+        if (typeIdx == 0) {
+            binnedData["TOTAL"][binTime]++;
+        } else {
+            if (targetUsers.contains(entry.user)) {
+                binnedData[entry.user][binTime]++;
+            }
+        }
+    }
+    
+    // シリーズ作成
+    for (auto it = binnedData.begin(); it != binnedData.end(); ++it) {
+        QLineSeries* series = new QLineSeries();
+        series->setName(it.key() == "TOTAL" ? "総コメント数" : it.key());
+        
+        auto bins = it.value();
+        // 最初の時間から最後の時間まで0埋めしつつプロット
+        for (qint64 t = firstTime; t <= lastTime + binSizeMs; t += binSizeMs) {
+            int count = bins.value(t, 0);
+            series->append(t, count);
+            if (count > maxCount) maxCount = count;
+        }
+        m_chart->addSeries(series);
+        series->attachAxis(m_axisX);
+        series->attachAxis(m_axisY);
+    }
+    
+    qDebug() << "setting axis ranges";
+    m_axisX->setRange(QDateTime::fromMSecsSinceEpoch(firstTime), QDateTime::fromMSecsSinceEpoch(lastTime + binSizeMs));
+    m_axisY->setRange(0, maxCount + 1);
+    m_axisY->setTickCount(qMin(10LL, maxCount + 2));
+    qDebug() << "updateChartDisplay finish";
 }

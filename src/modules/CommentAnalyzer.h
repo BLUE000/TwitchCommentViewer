@@ -14,11 +14,14 @@ public:
     void analyzeComment(const QString& userId, const QString& username, const QString& message) override;
     QString sanitizeMessage(const QString& message) override;
 
+    void setBotUsers(const QStringList& bots);
+
 signals:
     // 解析結果の通知シグナル
     void spamDetected(const QString& username, const QString& reason, const QString& message);
     void trendWordDetected(const QString& word, int count);
     void emotionScored(const QString& username, const QString& message, double score);
+    void statisticsUpdated(int totalComments, const QMap<QString, int>& userCounts, const QString& latestUser, const QDateTime& latestTime);
 
 private:
     void initDictionaries();
@@ -41,4 +44,6 @@ private:
     
     // ユーザ統計 (簡易メモリキャッシュ)
     QMap<QString, int> m_userCommentCount;
+    int m_totalComments = 0;
+    QStringList m_botUsers;
 };

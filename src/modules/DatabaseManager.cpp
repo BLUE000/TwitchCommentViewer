@@ -75,3 +75,74 @@ bool DatabaseManager::logComment(const QString& userId, const QString& userName,
     }
     return true;
 }
+
+QList<CommentLog> DatabaseManager::getComments(const QDateTime& start, const QDateTime& end) {
+    QList<CommentLog> logs;
+    QSqlQuery query(m_db);
+    QString sql = "SELECT id, timestamp, user_id, username_enc FROM chat_logs WHERE 1=1";
+    
+    if (start.isValid()) {
+        sql += " AND timestamp >= :start";
+    }
+    if (end.isValid()) {
+        sql += " AND timestamp <= :end";
+    }
+    sql += " ORDER BY timestamp ASC";
+
+    query.prepare(sql);
+    if (start.isValid()) {
+        query.bindValue(":start", start.toString(Qt::ISODate));
+    }
+    if (end.isValid()) {
+        query.bindValue(":end", end.toString(Qt::ISODate));
+    }
+
+    if (!query.exec()) {
+        qWarning() << "Failed to get comments:" << query.lastError().text();
+        return logs;
+    }
+
+    while (query.next()) {
+        CommentLog log;
+        log.id = query.value(0).toLongLong();
+        log.timestamp = query.value(1).toDateTime();
+        log.userId = query.value(2).toString();
+        
+        QByteArray encName = query.value(3).toByteArray();
+        CipherResult decName = CipherEngine::decrypt(encName, m_cipherKey);
+        if (decName.isSuccess()) {
+            log.userName = QString::fromUtf8(decName.data());
+        } else {
+            log.userName = "Unknown";
+        }
+        logs.append(log);
+    }
+
+    return logs;
+}
+
+bool DatabaseManager::clearHistory(const QDateTime& start, const QDateTime& end) {
+    QSqlQuery query(m_db);
+    QString sql = "DELETE FROM chat_logs WHERE 1=1";
+    
+    if (start.isValid()) {
+        sql += " AND timestamp >= :start";
+    }
+    if (end.isValid()) {
+        sql += " AND timestamp <= :end";
+    }
+
+    query.prepare(sql);
+    if (start.isValid()) {
+        query.bindValue(":start", start.toString(Qt::ISODate));
+    }
+    if (end.isValid()) {
+        query.bindValue(":end", end.toString(Qt::ISODate));
+    }
+
+    if (!query.exec()) {
+        qWarning() << "Failed to clear history:" << query.lastError().text();
+        return false;
+    }
+    return true;
+}

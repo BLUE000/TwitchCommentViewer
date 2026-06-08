@@ -22,6 +22,7 @@ public:
 
     void initialize();
     void setMainWindow(MainWindow* mw) { m_mainWindow = mw; }
+    void updateBotUsers(const QStringList& bots);
 
 protected:
     // シグナルの代わりにEvent割り込みで処理を受け取る
@@ -42,4 +43,5 @@ private:
     void emitSpamDetected(const QString& username, const QString& reason, const QString& message);
     void emitTrendWordDetected(const QString& word, int count);
     void emitEmotionScored(const QString& username, const QString& message, double score);
+    void emitStatisticsUpdated(int totalComments, const QMap<QString, int>& userCounts, const QString& latestUser, const QDateTime& latestTime);
 };
