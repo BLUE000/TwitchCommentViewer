@@ -14,6 +14,8 @@ set(SOURCES
     events/TwitchEvents.h
     AppController.cpp
     AppController.h
+    modules/ConfigManager.cpp
+    modules/ConfigManager.h
 )
 
 add_executable(TwitchCommentManager ${SOURCES})

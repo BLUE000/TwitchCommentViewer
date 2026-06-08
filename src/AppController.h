@@ -4,6 +4,7 @@
 #include <memory>
 #include "interfaces/ITwitchEventCollector.h"
 #include "modules/DatabaseManager.h"
+#include "modules/ConfigManager.h"
 
 class AppController : public QObject {
     Q_OBJECT
@@ -18,6 +19,7 @@ protected:
     void customEvent(QEvent* event) override;
 
 private:
+    std::unique_ptr<ConfigManager> m_configManager;
     std::unique_ptr<ITwitchEventCollector> m_twitchCollector;
     std::unique_ptr<DatabaseManager> m_dbManager;
 };

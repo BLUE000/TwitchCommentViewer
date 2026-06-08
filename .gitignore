@@ -15,12 +15,17 @@ CMakeLists.txt.user
 *.user
 
 # Workspace / IDE
+*.code-workspace
 .vscode/
 .idea/
+
+# Application Config & Secrets
+config.json
+tokens.json
+twitch_comments.db
 .vs/
 *.swp
 *.swo
-*.code-workspace
 
 # TrustChain / TransCipher credentials
 trustchain_credentials.cmake

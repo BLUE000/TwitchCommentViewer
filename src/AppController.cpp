@@ -4,6 +4,8 @@
 #include <QDebug>
 
 AppController::AppController(QObject* parent) : QObject(parent) {
+    m_configManager = std::make_unique<ConfigManager>(this);
+    
     // 自身のインスタンスをイベントターゲットとして渡す
     m_twitchCollector = std::make_unique<TwitchEventCollectorImpl>(this);
     m_dbManager = std::make_unique<DatabaseManager>();
@@ -19,8 +21,22 @@ void AppController::initialize() {
         qWarning() << "Failed to initialize DBManager in AppController";
     }
 
-    // Twitch WebSocket 接続開始
-    m_twitchCollector->connectToTwitch();
+    // 設定を読み込み、OAuth認証を開始。成功したらTwitchへ接続。
+    if (m_configManager->loadConfig()) {
+        connect(m_configManager.get(), &ConfigManager::authCompleted, this, [this](bool success, const QString& errorMsg) {
+            if (success) {
+                qInfo() << "OAuth Flow Successful. Proceeding to connect Twitch EventSub...";
+                m_twitchCollector->connectToTwitch();
+            } else {
+                qWarning() << "OAuth Authentication Failed:" << errorMsg;
+            }
+        });
+        
+        // 認証フロー開始（必要ならブラウザが開く）
+        m_configManager->startOAuthFlow();
+    } else {
+        qWarning() << "config.json could not be loaded. Missing Client ID.";
+    }
 }
 
 void AppController::customEvent(QEvent* event) {
