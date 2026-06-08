@@ -37,6 +37,15 @@ add_custom_command(TARGET UnitTests POST_BUILD
     $<TARGET_FILE_DIR:UnitTests>
 )
 
-# include(GoogleTest)
-# gtest_discover_tests(UnitTests)
-add_test(NAME UnitTests COMMAND UnitTests)
+include(GoogleTest)
+gtest_discover_tests(UnitTests)
+
+# QtのDLLとプラグイン(qsqlite.dll等)をテストフォルダにもコピー
+if(WIN32)
+    find_program(WINDEPLOYQT_EXECUTABLE windeployqt HINTS "${Qt6_DIR}/../../../bin" "${Qt6_DIR}/../bin")
+    if(WINDEPLOYQT_EXECUTABLE)
+        add_custom_command(TARGET UnitTests POST_BUILD
+            COMMAND ${WINDEPLOYQT_EXECUTABLE} --no-translations --compiler-runtime "$<TARGET_FILE:UnitTests>"
+        )
+    endif()
+endif()
