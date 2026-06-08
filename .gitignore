@@ -1,0 +1,31 @@
+# CMake & Build
+build/
+build-*/
+out/
+bin/
+*.exe
+*.dll
+*.lib
+*.so
+*.dylib
+
+# Qt / Creator
+CMakeLists.txt.user
+*.pro.user
+*.user
+
+# Workspace / IDE
+.vscode/
+.idea/
+.vs/
+*.swp
+*.swo
+*.code-workspace
+
+# TrustChain / TransCipher credentials
+trustchain_credentials.cmake
+
+# Logs / DB
+*.log
+*.sqlite
+*.db

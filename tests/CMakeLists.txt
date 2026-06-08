@@ -1,0 +1,36 @@
+include(FetchContent)
+FetchContent_Declare(
+  googletest
+  URL https://github.com/google/googletest/archive/release-1.12.1.zip
+)
+# Windowsでビルドエラーを防ぐための設定
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+
+enable_testing()
+
+add_executable(UnitTests 
+    test_main.cpp
+)
+
+target_include_directories(UnitTests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(UnitTests PRIVATE ${CMAKE_SOURCE_DIR}/lib/TransCipher-Dist/include)
+target_link_directories(UnitTests PRIVATE ${CMAKE_SOURCE_DIR}/lib/TransCipher-Dist/lib)
+
+target_link_libraries(UnitTests PRIVATE
+    gtest_main
+    Qt6::Core
+    Qt6::Network
+    TransCipher
+)
+
+# テスト実行フォルダにもDLLをコピー
+add_custom_command(TARGET UnitTests POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${CMAKE_SOURCE_DIR}/lib/TransCipher-Dist/bin/libTransCipher.dll"
+    $<TARGET_FILE_DIR:UnitTests>
+)
+
+# include(GoogleTest)
+# gtest_discover_tests(UnitTests)
+add_test(NAME UnitTests COMMAND UnitTests)
