@@ -52,7 +52,7 @@
           </property>
          </widget>
         </item>
-        <item><widget class="QToolBox" name="toolBoxSettings"><property name="currentIndex"><number>0</number></property><widget class="QWidget" name="pageBouyomi"><attribute name="title"><string>棒読みちゃん連携設定</string></attribute><layout class="QVBoxLayout" name="verticalLayoutBouyomi"><item>
+        <item><widget class="QToolBox" name="toolBoxSettings"><property name="currentIndex"><number>0</number></property><widget class="QWidget" name="pageBouyomi"><attribute name="label"><string>▼ 棒読みちゃん連携設定</string></attribute><layout class="QVBoxLayout" name="verticalLayoutBouyomi"><item>
          <widget class="QGroupBox" name="groupBoxBouyomi">
           <property name="title">
            <string>棒読みちゃん連携設定</string>
@@ -169,7 +169,7 @@
           </layout>
          </widget>
         </item>
-        </layout></widget><widget class="QWidget" name="pageObs"><attribute name="title"><string>OBS連携設定</string></attribute><layout class="QVBoxLayout" name="verticalLayoutObsContainer"><item>
+        </layout></widget><widget class="QWidget" name="pageObs"><attribute name="label"><string>▼ OBS連携設定</string></attribute><layout class="QVBoxLayout" name="verticalLayoutObsContainer"><item>
          <widget class="QGroupBox" name="groupBoxObs">
           <property name="title">
            <string>OBS連携設定</string>
