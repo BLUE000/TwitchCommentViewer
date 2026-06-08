@@ -33,17 +33,18 @@ int main(int argc, char *argv[])
         TrustChain::Core::terminateApplication("このビルドはサーバー側で無効化されているため、起動できません。");
         return 0;
     }
-    
-    // TransCipher によるコピーライトの復号
-    QString customCopyright;
-    QByteArray encryptedData = QByteArray::fromHex(WATERMARK_ENCRYPTED_TEXT);
-    CipherResult result = CipherEngine::decrypt(encryptedData, WATERMARK_DECRYPT_KEY);
-    if (result.isSuccess()) {
-        customCopyright = QString::fromUtf8(result.data());
+    else if (status == TrustChain::AuthStatus::Watermarked) {
+        // TransCipher によるコピーライトの復号
+        QString customCopyright;
+        QByteArray encryptedData = QByteArray::fromHex(WATERMARK_ENCRYPTED_TEXT);
+        CipherResult result = CipherEngine::decrypt(encryptedData, WATERMARK_DECRYPT_KEY);
+        if (result.isSuccess()) {
+            customCopyright = QString::fromUtf8(result.data());
+        }
+        
+        // QtHelper を用いてウォーターマーク（タイトルとステータスバーへの表記）を適用
+        TrustChain::QtHelper::applyWatermark(&w, status, customCopyright);
     }
-    
-    // QtHelper を用いてウォーターマーク（タイトルとステータスバーへの表記）を適用
-    TrustChain::QtHelper::applyWatermark(&w, status, customCopyright);
 
     // AppController の初期化と稼働開始
     AppController appController;
