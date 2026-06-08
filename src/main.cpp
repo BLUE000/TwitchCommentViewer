@@ -5,15 +5,6 @@
 #include "AppController.h"
 #include <TrustChainCore.hpp>
 #include <TrustChainQt.hpp>
-#include <cipher_engine.h>
-
-#ifndef WATERMARK_ENCRYPTED_TEXT
-#define WATERMARK_ENCRYPTED_TEXT "dummy"
-#endif
-
-#ifndef WATERMARK_DECRYPT_KEY
-#define WATERMARK_DECRYPT_KEY "dummy_key"
-#endif
 
 int main(int argc, char *argv[])
 {
@@ -34,18 +25,8 @@ int main(int argc, char *argv[])
         return 0;
     }
     else if (status == TrustChain::AuthStatus::Watermarked) {
-        // TransCipher によるコピーライトの復号
-        QString customCopyright;
-        QByteArray encryptedData = QByteArray::fromHex(WATERMARK_ENCRYPTED_TEXT);
-        CipherResult result = CipherEngine::decrypt(encryptedData, WATERMARK_DECRYPT_KEY);
-        if (result.isSuccess()) {
-            customCopyright = QString::fromUtf8(result.data());
-        } else {
-            customCopyright = "Unknown Creator"; // 復号失敗時の生Hex漏洩を防ぐフォールバック
-        }
-        
-        // QtHelper を用いてウォーターマーク（タイトルとステータスバーへの表記）を適用
-        TrustChain::QtHelper::applyWatermark(&w, status, customCopyright);
+        // 4. ガードマンの判定をもとに、画面にウォーターマークをつけます（ポインタをそのまま渡せば動きます）
+        TrustChain::QtHelper::applyWatermark(&w, status);
     }
 
     // AppController の初期化と稼働開始

@@ -56,10 +56,8 @@ target_link_libraries(TwitchCommentManager PRIVATE
 # 認証情報を読み込んでマクロに渡す
 include("${CMAKE_SOURCE_DIR}/trustchain_credentials.cmake" OPTIONAL)
 
-# ウォーターマークの暗号文と復号キーをアプリ本体にマクロとして注入
+# アプリ本体にマクロとして注入
 target_compile_definitions(TwitchCommentManager PRIVATE
-    WATERMARK_ENCRYPTED_TEXT="${TRUSTCHAIN_DEFAULT_CREATOR}"
-    WATERMARK_DECRYPT_KEY="${TRUSTCHAIN_WATERMARK_KEY}"
     APP_VERSION="${TwitchCommentManager_VERSION}"
 )
 
