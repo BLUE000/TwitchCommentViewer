@@ -8,6 +8,8 @@ public:
     // コメントを解析する
     // userId: 発言者のTwitch ID
     // username: 発言者の名前
-    // message: 発言内容
     virtual void analyzeComment(const QString& userId, const QString& username, const QString& message) = 0;
+    
+    // スパム・NGワードを伏せ字 (***) に置き換えた安全な文字列を返す
+    virtual QString sanitizeMessage(const QString& message) = 0;
 };

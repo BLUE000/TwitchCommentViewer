@@ -12,6 +12,7 @@ public:
     ~CommentAnalyzer() override = default;
 
     void analyzeComment(const QString& userId, const QString& username, const QString& message) override;
+    QString sanitizeMessage(const QString& message) override;
 
 signals:
     // 解析結果の通知シグナル

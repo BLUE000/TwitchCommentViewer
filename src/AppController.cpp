@@ -90,9 +90,11 @@ void AppController::customEvent(QEvent* event) {
                 << "\n User:" << commentEvent->userName() 
                 << "\n Msg:" << commentEvent->message();
 
-        // 解析実行
+        // 解析実行とサニタイズ（伏せ字化）
+        QString safeMessage = commentEvent->message();
         if (m_commentAnalyzer) {
-            m_commentAnalyzer->analyzeComment(commentEvent->userId(), commentEvent->userName(), commentEvent->message());
+            safeMessage = m_commentAnalyzer->sanitizeMessage(commentEvent->message());
+            m_commentAnalyzer->analyzeComment(commentEvent->userId(), commentEvent->userName(), safeMessage);
         }
 
         bool isSpam = false;
@@ -101,19 +103,19 @@ void AppController::customEvent(QEvent* event) {
         // DBへのセキュア保存
         m_dbManager->logComment(commentEvent->userId(), 
                                 commentEvent->userName(), 
-                                commentEvent->message(), 
+                                safeMessage, 
                                 sentiment, isSpam);
         
         // 棒読みちゃん連携 (スパム判定が入った場合はスキップするなど後で追加可能)
         if (!isSpam) {
             // 例: 「ユーザー名、メッセージ」の形式で読ませる
-            m_bouyomiIntegration->sendText(commentEvent->userName() + "、" + commentEvent->message());
+            m_bouyomiIntegration->sendText(commentEvent->userName() + "、" + safeMessage);
         }
 
         // UIへの反映処理
         if (m_mainWindow) {
             // QtのGUIスレッドから安全にUIを更新
-            QMetaObject::invokeMethod(m_mainWindow, [this, name = commentEvent->userName(), msg = commentEvent->message()]() {
+            QMetaObject::invokeMethod(m_mainWindow, [this, name = commentEvent->userName(), msg = safeMessage]() {
                 m_mainWindow->addCommentToView(name, msg);
             }, Qt::QueuedConnection);
         }

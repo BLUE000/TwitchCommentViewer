@@ -87,6 +87,18 @@ QString CommentAnalyzer::checkSpam(const QString& message) {
     return "";
 }
 
+QString CommentAnalyzer::sanitizeMessage(const QString& message) {
+    QString sanitized = message;
+    for (const QString& word : m_spamWords) {
+        if (sanitized.contains(word, Qt::CaseInsensitive)) {
+            QString replacement;
+            replacement.fill('*', word.length());
+            sanitized.replace(word, replacement, Qt::CaseInsensitive);
+        }
+    }
+    return sanitized;
+}
+
 double CommentAnalyzer::calculateEmotionScore(const QString& message) {
     int positiveCount = 0;
     int negativeCount = 0;
