@@ -58,12 +58,17 @@ bool ConfigManager::loadConfig() {
         m_bouyomiAutoStop = bouyomiObj["auto_stop"].toBool();
     }
     
-    QJsonObject obsObj = json["obs"].toObject();
-    if (obsObj.contains("file_output")) {
-        m_obsFileOutputEnabled = obsObj["file_output"].toBool();
+    if (json.contains("obs_file_output")) {
+        m_obsFileOutputEnabled = json["obs_file_output"].toBool(false);
     }
-    if (obsObj.contains("websocket")) {
-        m_obsWebSocketEnabled = obsObj["websocket"].toBool();
+    if (json.contains("obs_websocket")) {
+        m_obsWebSocketEnabled = json["obs_websocket"].toBool(false);
+    }
+    if (json.contains("obs_server_port")) {
+        m_obsServerPort = json["obs_server_port"].toInt(8081);
+    }
+    if (json.contains("obs_overlay_file")) {
+        m_obsOverlayFile = json["obs_overlay_file"].toString("overlay.html");
     }
 
     // 認証情報の復号化と読み込み
@@ -94,10 +99,10 @@ void ConfigManager::saveConfig() {
     bouyomiObj["auto_stop"] = m_bouyomiAutoStop;
     rootObj["bouyomi"] = bouyomiObj;
 
-    QJsonObject obsObj;
-    obsObj["file_output"] = m_obsFileOutputEnabled;
-    obsObj["websocket"] = m_obsWebSocketEnabled;
-    rootObj["obs"] = obsObj;
+    rootObj["obs_file_output"] = m_obsFileOutputEnabled;
+    rootObj["obs_websocket"] = m_obsWebSocketEnabled;
+    rootObj["obs_server_port"] = m_obsServerPort;
+    rootObj["obs_overlay_file"] = m_obsOverlayFile;
 
     // トークン情報の暗号化と保存
     QJsonDocument doc(rootObj);
@@ -260,6 +265,22 @@ bool ConfigManager::getObsWebSocketEnabled() const {
 
 void ConfigManager::setObsWebSocketEnabled(bool enabled) {
     m_obsWebSocketEnabled = enabled;
+}
+
+int ConfigManager::getObsServerPort() const {
+    return m_obsServerPort;
+}
+
+void ConfigManager::setObsServerPort(int port) {
+    m_obsServerPort = port;
+}
+
+QString ConfigManager::getObsOverlayFile() const {
+    return m_obsOverlayFile;
+}
+
+void ConfigManager::setObsOverlayFile(const QString& filename) {
+    m_obsOverlayFile = filename;
 }
 
 bool ConfigManager::loadToken() {

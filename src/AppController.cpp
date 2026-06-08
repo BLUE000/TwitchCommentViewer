@@ -3,6 +3,7 @@
 #include "modules/BouyomiIntegrationImpl.h"
 #include "modules/ObsFileIntegrationImpl.h"
 #include "modules/ObsWebSocketServer.h"
+#include "modules/ObsHttpServer.h"
 #include "modules/CommentAnalyzer.h"
 #include "events/TwitchEvents.h"
 #include "MainWindow.h"
@@ -16,9 +17,10 @@ AppController::AppController(QObject* parent) : QObject(parent) {
     m_dbManager = std::make_unique<DatabaseManager>();
     m_bouyomiIntegration = std::make_unique<BouyomiIntegrationImpl>(m_configManager.get(), this);
     
-    // OBS連携モジュールの初期化
+    // OBS連携モジュールの初期化 (ポートは初期化時に設定)
     m_obsFileIntegration = std::make_unique<ObsFileIntegrationImpl>(this);
-    m_obsWsIntegration = std::make_unique<ObsWebSocketServer>(8080, this);
+    m_obsWsIntegration = nullptr; // 後でポートを取得してから初期化
+    m_obsHttpServer = std::make_unique<ObsHttpServer>(this);
     
     // コメントアナライザーの初期化とシグナル接続
     auto analyzer = std::make_unique<CommentAnalyzer>(this);
@@ -42,6 +44,21 @@ void AppController::initialize() {
     if (m_configManager->loadConfig()) {
         if (m_bouyomiIntegration) {
             m_bouyomiIntegration->initialize();
+        }
+
+        // HTTPサーバーとWebSocketサーバーの起動
+        if (m_obsHttpServer) {
+            int httpPort = m_configManager->getObsServerPort();
+            m_obsHttpServer->setIndexFile(m_configManager->getObsOverlayFile());
+            if (m_obsHttpServer->listen(QHostAddress::Any, httpPort)) {
+                qInfo() << "OBS HTTP Server listening on port" << httpPort;
+            } else {
+                qWarning() << "Failed to start OBS HTTP Server on port" << httpPort;
+            }
+
+            if (!m_obsWsIntegration) {
+                m_obsWsIntegration = std::make_unique<ObsWebSocketServer>(httpPort + 1, this);
+            }
         }
 
         connect(m_configManager.get(), &ConfigManager::authCompleted, this, [this](bool success, const QString& errorMsg) {

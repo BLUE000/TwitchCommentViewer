@@ -9,8 +9,13 @@
     <div id="comment-container"></div>
 
     <script>
-        // WebSocketサーバーに接続
-        const ws = new WebSocket('ws://localhost:8080');
+        let wsPort = 8082; // default fallback
+        if (window.location.port) {
+            wsPort = parseInt(window.location.port) + 1;
+        }
+        
+        console.log(`Connecting to WebSocket on port ${wsPort}...`);
+        const ws = new WebSocket('ws://localhost:' + wsPort);
 
         ws.onopen = () => {
             console.log('Connected to OBS WebSocket Server');

@@ -62,10 +62,15 @@ void MainWindow::setConfigManager(ConfigManager* configManager) {
 
     ui->chkObsFileOutput->setChecked(m_configManager->getObsFileOutputEnabled());
     ui->chkObsWebSocket->setChecked(m_configManager->getObsWebSocketEnabled());
+    ui->spinObsPort->setValue(m_configManager->getObsServerPort());
+    
+    loadOverlayFiles();
+    int idx = ui->comboObsOverlay->findText(m_configManager->getObsOverlayFile());
+    if (idx >= 0) ui->comboObsOverlay->setCurrentIndex(idx);
         
-    // OBSローカルファイルのパスを生成してセットする
-    QString overlayPath = QCoreApplication::applicationDirPath() + "/assets/overlay/overlay.html";
-    ui->editObsUrl->setText("file:///" + overlayPath.replace("\\", "/"));
+    // OBSローカルのパスを生成してセットする (HTTP用)
+    QString url = QString("http://localhost:%1/").arg(m_configManager->getObsServerPort());
+    ui->editObsUrl->setText(url);
 }
 
 void MainWindow::on_btnBrowseBouyomi_clicked() {
@@ -106,7 +111,12 @@ void MainWindow::on_btnSaveObs_clicked() {
     if (m_configManager) {
         m_configManager->setObsFileOutputEnabled(ui->chkObsFileOutput->isChecked());
         m_configManager->setObsWebSocketEnabled(ui->chkObsWebSocket->isChecked());
+        m_configManager->setObsServerPort(ui->spinObsPort->value());
+        m_configManager->setObsOverlayFile(ui->comboObsOverlay->currentText());
         m_configManager->saveConfig();
+        
+        QString url = QString("http://localhost:%1/").arg(ui->spinObsPort->value());
+        ui->editObsUrl->setText(url);
     }
 }
 
@@ -123,4 +133,28 @@ void MainWindow::on_btnToggleBouyomi_toggled(bool checked) {
 void MainWindow::on_btnToggleObs_toggled(bool checked) {
     ui->groupBoxObs->setVisible(checked);
     ui->btnToggleObs->setText(checked ? "▼ OBS連携設定" : "▶ OBS連携設定");
+}
+
+void MainWindow::on_btnOpenOverlayFolder_clicked() {
+    QString path = QCoreApplication::applicationDirPath() + "/assets/overlay";
+    QDir dir(path);
+    if (!dir.exists()) {
+        dir.mkpath(".");
+    }
+    QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+}
+
+void MainWindow::loadOverlayFiles() {
+    ui->comboObsOverlay->clear();
+    QString path = QCoreApplication::applicationDirPath() + "/assets/overlay";
+    QDir dir(path);
+    if (dir.exists()) {
+        QStringList filters;
+        filters << "*.html" << "*.htm";
+        QStringList files = dir.entryList(filters, QDir::Files);
+        ui->comboObsOverlay->addItems(files);
+    }
+    if (ui->comboObsOverlay->count() == 0) {
+        ui->comboObsOverlay->addItem("overlay.html");
+    }
 }

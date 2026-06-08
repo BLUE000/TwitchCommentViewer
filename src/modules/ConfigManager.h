@@ -46,6 +46,12 @@ public:
     bool getObsWebSocketEnabled() const;
     void setObsWebSocketEnabled(bool enabled);
 
+    int getObsServerPort() const;
+    void setObsServerPort(int port);
+
+    QString getObsOverlayFile() const;
+    void setObsOverlayFile(const QString& filename);
+
     // 認証情報
     void saveConfig(); // 設定保存用メソッド
 
@@ -75,6 +81,8 @@ private:
 
     bool m_obsFileOutputEnabled = false;
     bool m_obsWebSocketEnabled = false;
+    int m_obsServerPort = 8081;
+    QString m_obsOverlayFile = "overlay.html";
 
     QTcpServer* m_httpServer;
 

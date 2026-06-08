@@ -17,6 +17,8 @@ set(SOURCES
     modules/ObsFileIntegrationImpl.h
     modules/ObsWebSocketServer.cpp
     modules/ObsWebSocketServer.h
+    modules/ObsHttpServer.cpp
+    modules/ObsHttpServer.h
     events/TwitchEvents.h
     AppController.cpp
     AppController.h

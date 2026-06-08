@@ -171,7 +171,7 @@
              <property name="text"><string>コメントをテキストファイルに出力する</string></property>
             </widget>
            </item>
-           <item>
+           <item><widget class="QLabel" name="labelObsPort"><property name="text"><string>HTTPサーバーポート:</string></property></widget></item><item><widget class="QSpinBox" name="spinObsPort"><property name="minimum"><number>1</number></property><property name="maximum"><number>65535</number></property><property name="value"><number>8081</number></property></widget></item><item><widget class="QLabel" name="labelObsOverlay"><property name="text"><string>オーバーレイファイル:</string></property></widget></item><item><layout class="QHBoxLayout" name="hlayoutObsOverlay"><item><widget class="QComboBox" name="comboObsOverlay" /></item><item><widget class="QPushButton" name="btnOpenOverlayFolder"><property name="text"><string>フォルダを開く</string></property></widget></item></layout></item><item>
             <widget class="QCheckBox" name="chkObsWebSocket">
              <property name="text"><string>OBSブラウザソース連携（WebSocketサーバー）を有効にする</string></property>
             </widget>
