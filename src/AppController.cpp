@@ -11,7 +11,7 @@ AppController::AppController(QObject* parent) : QObject(parent) {
     // 自身のインスタンスをイベントターゲットとして渡す
     m_twitchCollector = std::make_unique<TwitchEventCollectorImpl>(this);
     m_dbManager = std::make_unique<DatabaseManager>();
-    m_bouyomiIntegration = std::make_unique<BouyomiIntegrationImpl>(this);
+    m_bouyomiIntegration = std::make_unique<BouyomiIntegrationImpl>(m_configManager.get(), this);
 }
 
 AppController::~AppController() {
@@ -42,6 +42,8 @@ void AppController::initialize() {
         
         // UIの認証ボタンが押されたらフローを開始する
         if (m_mainWindow) {
+            m_mainWindow->setConfigManager(m_configManager.get());
+            
             connect(m_mainWindow, &MainWindow::authRequested, this, [this]() {
                 qInfo() << "Auth requested from UI. Starting OAuth Flow...";
                 m_configManager->startOAuthFlow();

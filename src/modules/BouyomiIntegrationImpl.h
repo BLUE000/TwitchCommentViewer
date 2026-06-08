@@ -3,15 +3,16 @@
 #include <QObject>
 #include <QTcpSocket>
 
+class ConfigManager;
+
 class BouyomiIntegrationImpl : public QObject, public IBouyomiIntegration {
     Q_OBJECT
 public:
-    explicit BouyomiIntegrationImpl(QObject* parent = nullptr);
+    explicit BouyomiIntegrationImpl(ConfigManager* config, QObject* parent = nullptr);
     ~BouyomiIntegrationImpl() override;
 
     void sendText(const QString& text) override;
 
 private:
-    QString m_host;
-    quint16 m_port;
+    ConfigManager* m_config;
 };

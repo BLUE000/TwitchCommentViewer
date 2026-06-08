@@ -7,6 +7,7 @@
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
+class ConfigManager;
 
 class MainWindow : public QMainWindow
 {
@@ -18,6 +19,7 @@ public:
 
     // UIのテーブルにコメントを追加する
     void addCommentToView(const QString& username, const QString& message);
+    void setConfigManager(ConfigManager* configManager);
 
 signals:
     // 設定タブで認証ボタンが押されたことを通知
@@ -25,9 +27,12 @@ signals:
 
 private slots:
     void on_btnStartAuth_clicked();
+    void on_btnBrowseBouyomi_clicked();
+    void on_btnSaveBouyomi_clicked();
 
 private:
     Ui::MainWindow *ui;
     QStandardItemModel* m_chatModel;
+    ConfigManager* m_configManager = nullptr;
 };
 #endif // MAINWINDOW_H

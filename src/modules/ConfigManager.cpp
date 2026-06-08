@@ -37,14 +37,48 @@ bool ConfigManager::loadConfig() {
     QJsonDocument doc = QJsonDocument::fromJson(data);
     if (!doc.isObject()) return false;
 
-    QJsonObject obj = doc.object();
-    m_clientId = obj["twitch_client_id"].toString();
-    m_redirectUri = obj["twitch_redirect_uri"].toString();
+    QJsonObject json = doc.object();
+    
+    // 既存のキー名との互換性
+    if (json.contains("twitch_client_id")) m_clientId = json["twitch_client_id"].toString();
+    else if (json.contains("clientId")) m_clientId = json["clientId"].toString();
+    
+    if (json.contains("twitch_redirect_uri")) m_redirectUri = json["twitch_redirect_uri"].toString();
+    else if (json.contains("redirectUri")) m_redirectUri = json["redirectUri"].toString();
+    
+    // 棒読みちゃん設定の読み込み
+    if (json.contains("bouyomiHost")) m_bouyomiHost = json["bouyomiHost"].toString();
+    if (json.contains("bouyomiPort")) m_bouyomiPort = json["bouyomiPort"].toInt();
+    if (json.contains("bouyomiExePath")) m_bouyomiExePath = json["bouyomiExePath"].toString();
+    if (json.contains("bouyomiVoice")) m_bouyomiVoice = json["bouyomiVoice"].toInt();
+    if (json.contains("bouyomiVolume")) m_bouyomiVolume = json["bouyomiVolume"].toInt();
 
     // 保存されているトークンがあれば読み込む
     loadToken();
 
     return !m_clientId.isEmpty() && !m_redirectUri.isEmpty();
+}
+
+void ConfigManager::saveConfig() {
+    QString configPath = QCoreApplication::applicationDirPath() + "/config.json";
+    QFile file(configPath);
+    if (!file.open(QIODevice::WriteOnly)) {
+        qWarning() << "Failed to open config.json for writing.";
+        return;
+    }
+
+    QJsonObject json;
+    json["twitch_client_id"] = m_clientId;
+    json["twitch_redirect_uri"] = m_redirectUri;
+    
+    json["bouyomiHost"] = m_bouyomiHost;
+    json["bouyomiPort"] = m_bouyomiPort;
+    json["bouyomiExePath"] = m_bouyomiExePath;
+    json["bouyomiVoice"] = m_bouyomiVoice;
+    json["bouyomiVolume"] = m_bouyomiVolume;
+
+    QJsonDocument doc(json);
+    file.write(doc.toJson());
 }
 
 void ConfigManager::startOAuthFlow() {

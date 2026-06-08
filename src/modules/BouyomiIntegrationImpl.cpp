@@ -1,9 +1,10 @@
 #include "BouyomiIntegrationImpl.h"
+#include "ConfigManager.h"
 #include <QDataStream>
 #include <QDebug>
 
-BouyomiIntegrationImpl::BouyomiIntegrationImpl(QObject* parent)
-    : QObject(parent), m_host("127.0.0.1"), m_port(50001)
+BouyomiIntegrationImpl::BouyomiIntegrationImpl(ConfigManager* config, QObject* parent)
+    : QObject(parent), m_config(config)
 {
 }
 
@@ -22,8 +23,13 @@ void BouyomiIntegrationImpl::sendText(const QString& text) {
     stream << static_cast<qint16>(0x0001);  // Command: 1 (読み上げ)
     stream << static_cast<qint16>(-1);      // Speed: -1 (デフォルト)
     stream << static_cast<qint16>(-1);      // Tone: -1 (デフォルト)
-    stream << static_cast<qint16>(-1);      // Volume: -1 (デフォルト)
-    stream << static_cast<qint16>(0);       // Voice: 0 (デフォルト)
+    
+    int volume = m_config ? m_config->bouyomiVolume() : -1;
+    stream << static_cast<qint16>(volume);  // Volume
+    
+    int voice = m_config ? m_config->bouyomiVoice() : 0;
+    stream << static_cast<qint16>(voice);   // Voice
+    
     stream << static_cast<qint8>(0);        // CharCode: 0 (UTF-8)
     stream << static_cast<qint32>(textData.size()); // Length
 
@@ -44,5 +50,7 @@ void BouyomiIntegrationImpl::sendText(const QString& text) {
         socket->deleteLater();
     });
 
-    socket->connectToHost(m_host, m_port);
+    QString host = m_config ? m_config->bouyomiHost() : "127.0.0.1";
+    int port = m_config ? m_config->bouyomiPort() : 50001;
+    socket->connectToHost(host, port);
 }
