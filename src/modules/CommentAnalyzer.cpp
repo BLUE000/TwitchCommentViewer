@@ -89,6 +89,8 @@ QString CommentAnalyzer::checkSpam(const QString& message) {
 
 QString CommentAnalyzer::sanitizeMessage(const QString& message) {
     QString sanitized = message;
+    
+    // 1. NGワードの置換
     for (const QString& word : m_spamWords) {
         if (sanitized.contains(word, Qt::CaseInsensitive)) {
             QString replacement;
@@ -96,6 +98,32 @@ QString CommentAnalyzer::sanitizeMessage(const QString& message) {
             sanitized.replace(word, replacement, Qt::CaseInsensitive);
         }
     }
+    
+    // 2. 文字の連続スパムの省略 (同じ文字が連続する場合は3文字+...にまとめる)
+    if (!sanitized.isEmpty()) {
+        QString collapsed;
+        int currentRepeat = 1;
+        QChar lastChar = sanitized[0];
+        collapsed.append(lastChar);
+        
+        for (int i = 1; i < sanitized.length(); ++i) {
+            if (sanitized[i] == lastChar) {
+                currentRepeat++;
+                if (currentRepeat <= 3) {
+                    collapsed.append(sanitized[i]);
+                } else if (currentRepeat == 4) {
+                    collapsed.append("...");
+                }
+                // 5回目以降の同じ文字はスキップ
+            } else {
+                currentRepeat = 1;
+                lastChar = sanitized[i];
+                collapsed.append(lastChar);
+            }
+        }
+        sanitized = collapsed;
+    }
+    
     return sanitized;
 }
 
