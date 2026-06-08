@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <ui version="4.0">
  <class>MainWindow</class>
  <widget class="QMainWindow" name="MainWindow">
@@ -26,7 +26,7 @@
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout_2">
         <item>
-         <widget class="QTableView" name="tableViewComments"/>
+         <widget class="QTableView" name="tableViewComments" />
         </item>
        </layout>
       </widget>
@@ -36,7 +36,7 @@
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout_3">
         <item>
-         <widget class="QTextBrowser" name="textBrowserAnalysis"/>
+         <widget class="QTextBrowser" name="textBrowserAnalysis" />
         </item>
        </layout>
       </widget>
@@ -52,7 +52,7 @@
           </property>
          </widget>
         </item>
-        <item>
+        <item><widget class="QToolBox" name="toolBoxSettings"><property name="currentIndex"><number>0</number></property><widget class="QWidget" name="pageBouyomi"><attribute name="title"><string>棒読みちゃん連携設定</string></attribute><layout class="QVBoxLayout" name="verticalLayoutBouyomi"><item>
          <widget class="QGroupBox" name="groupBoxBouyomi">
           <property name="title">
            <string>棒読みちゃん連携設定</string>
@@ -87,7 +87,7 @@
            <item row="2" column="1">
             <layout class="QHBoxLayout" name="horizontalLayoutExe">
              <item>
-              <widget class="QLineEdit" name="editBouyomiExe"/>
+              <widget class="QLineEdit" name="editBouyomiExe" />
              </item>
              <item>
               <widget class="QPushButton" name="btnBrowseBouyomi">
@@ -169,7 +169,7 @@
           </layout>
          </widget>
         </item>
-        <item>
+        </layout></widget><widget class="QWidget" name="pageObs"><attribute name="title"><string>OBS連携設定</string></attribute><layout class="QVBoxLayout" name="verticalLayoutObsContainer"><item>
          <widget class="QGroupBox" name="groupBoxObs">
           <property name="title">
            <string>OBS連携設定</string>
@@ -185,7 +185,7 @@
              <property name="text"><string>OBSブラウザソース連携（WebSocketサーバー）を有効にする</string></property>
             </widget>
            </item>
-           <item>
+           <item><layout class="QHBoxLayout" name="horizontalLayoutObsUrl"><item><widget class="QLabel" name="labelObsUrl"><property name="text"><string>ブラウザソースURL:</string></property></widget></item><item><widget class="QLineEdit" name="editObsUrl"><property name="readOnly"><bool>true</bool></property><property name="text"><string>http://localhost:8080 (あるいは overlay.html を直接読み込み)</string></property></widget></item><item><widget class="QPushButton" name="btnCopyObsUrl"><property name="text"><string>URLコピー</string></property></widget></item></layout></item><item>
             <widget class="QPushButton" name="btnSaveObs">
              <property name="text"><string>OBS設定を保存</string></property>
             </widget>
@@ -193,7 +193,7 @@
           </layout>
          </widget>
         </item>
-        <item>
+        </layout></widget></widget></item><item>
          <spacer name="verticalSpacer">
           <property name="orientation">
            <enum>Qt::Vertical</enum>
@@ -212,8 +212,8 @@
     </item>
    </layout>
   </widget>
-  <widget class="QStatusBar" name="statusbar"/>
+  <widget class="QStatusBar" name="statusbar" />
  </widget>
- <resources/>
- <connections/>
+ <resources />
+ <connections />
 </ui>

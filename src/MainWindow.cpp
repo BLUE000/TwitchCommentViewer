@@ -3,6 +3,9 @@
 #include "modules/ConfigManager.h"
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QDesktopServices>
+#include <QClipboard>
+#include <QDir>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -59,6 +62,10 @@ void MainWindow::setConfigManager(ConfigManager* configManager) {
 
     ui->chkObsFileOutput->setChecked(m_configManager->getObsFileOutputEnabled());
     ui->chkObsWebSocket->setChecked(m_configManager->getObsWebSocketEnabled());
+        
+    // OBSローカルファイルのパスを生成してセットする
+    QString overlayPath = QCoreApplication::applicationDirPath() + "/assets/overlay/overlay.html";
+    ui->editObsUrl->setText("file:///" + overlayPath.replace("\\", "/"));
 }
 
 void MainWindow::on_btnBrowseBouyomi_clicked() {
@@ -101,4 +108,9 @@ void MainWindow::on_btnSaveObs_clicked() {
         m_configManager->setObsWebSocketEnabled(ui->chkObsWebSocket->isChecked());
         m_configManager->saveConfig();
     }
+}
+
+void MainWindow::on_btnCopyObsUrl_clicked() {
+    QClipboard *clipboard = QGuiApplication::clipboard();
+    clipboard->setText(ui->editObsUrl->text());
 }
