@@ -40,6 +40,8 @@ int main(int argc, char *argv[])
         CipherResult result = CipherEngine::decrypt(encryptedData, WATERMARK_DECRYPT_KEY);
         if (result.isSuccess()) {
             customCopyright = QString::fromUtf8(result.data());
+        } else {
+            customCopyright = "Unknown Creator"; // 復号失敗時の生Hex漏洩を防ぐフォールバック
         }
         
         // QtHelper を用いてウォーターマーク（タイトルとステータスバーへの表記）を適用
