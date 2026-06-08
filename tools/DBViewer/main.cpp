@@ -1,16 +1,12 @@
 #include <QApplication>
-#include <QMainWindow>
-#include <QLabel>
+#include "ViewerMainWindow.h"
 
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
     
-    QMainWindow w;
-    w.setWindowTitle("DB Viewer (Mock)");
-    QLabel* label = new QLabel("DB Viewer App Started", &w);
-    w.setCentralWidget(label);
-    
+    ViewerMainWindow w;
     w.show();
+    
     return a.exec();
 }

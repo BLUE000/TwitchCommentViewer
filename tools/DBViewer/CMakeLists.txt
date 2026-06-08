@@ -4,6 +4,9 @@ set(CMAKE_AUTORCC ON)
 
 set(SOURCES
     main.cpp
+    ViewerMainWindow.cpp
+    ViewerMainWindow.h
+    ViewerMainWindow.ui
 )
 
 add_executable(TwitchCommentDbViewer ${SOURCES})
