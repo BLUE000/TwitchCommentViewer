@@ -38,6 +38,9 @@ private slots:
     void on_btnToggleBouyomi_toggled(bool checked);
     void on_btnToggleObs_toggled(bool checked);
 
+    void on_btnReadme_clicked();
+    void on_btnAbout_clicked();
+
 public slots:
     void appendAnalysisLog(const QString& logMsg);
 

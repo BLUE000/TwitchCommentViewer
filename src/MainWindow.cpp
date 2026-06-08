@@ -5,7 +5,11 @@
 #include <QMessageBox>
 #include <QDesktopServices>
 #include <QClipboard>
+#include <QUrl>
 #include <QDir>
+#include <QMessageBox>
+#include <QHBoxLayout>
+#include <QPushButton>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -13,6 +17,21 @@ MainWindow::MainWindow(QWidget *parent)
     , m_chatModel(new QStandardItemModel(0, 2, this))
 {
     ui->setupUi(this);
+
+    // QTabWidgetの右上にボタンを追加
+    QWidget* cornerWidget = new QWidget(this);
+    QHBoxLayout* cornerLayout = new QHBoxLayout(cornerWidget);
+    cornerLayout->setContentsMargins(0, 0, 0, 0);
+    cornerLayout->setSpacing(5);
+    
+    QPushButton* btnReadme = new QPushButton("README", cornerWidget);
+    QPushButton* btnAbout = new QPushButton("About", cornerWidget);
+    cornerLayout->addWidget(btnReadme);
+    cornerLayout->addWidget(btnAbout);
+    ui->tabWidget->setCornerWidget(cornerWidget);
+
+    connect(btnReadme, &QPushButton::clicked, this, &MainWindow::on_btnReadme_clicked);
+    connect(btnAbout, &QPushButton::clicked, this, &MainWindow::on_btnAbout_clicked);
 
     // ビューワタブのテーブル設定
     m_chatModel->setHeaderData(0, Qt::Horizontal, "Username");
@@ -157,4 +176,24 @@ void MainWindow::loadOverlayFiles() {
     if (ui->comboObsOverlay->count() == 0) {
         ui->comboObsOverlay->addItem("overlay.html");
     }
+}
+
+void MainWindow::on_btnReadme_clicked() {
+    QDesktopServices::openUrl(QUrl("https://github.com/BLUE000/TwitchCommentViewer/blob/master/README.md"));
+}
+
+void MainWindow::on_btnAbout_clicked() {
+    QString aboutText = 
+        "<h2>TwitchCommentManager</h2>"
+        "<p>Copyright (c) 2026 BLUE000</p>"
+        "<h3>サードパーティ・ライセンス</h3>"
+        "<p>本ソフトウェアは、以下のオープンソースライブラリおよびセキュリティモジュールを利用しています。</p>"
+        "<p>This software uses TrustChain Module. Copyright (c) 2026 BLUE000.<br>"
+        "Includes TransCipher, Copyright (c) 2026 BLUE000. (<a href=\"https://github.com/BLUE000/TransCipher-Dist\">https://github.com/BLUE000/TransCipher-Dist</a>)<br>"
+        "Includes BinMarkManager, Copyright (c) 2026 BLUE. (<a href=\"https://github.com/BLUE000/BinMarkManager\">https://github.com/BLUE000/BinMarkManager</a>)</p>"
+        "<p>Qt is licensed under the GNU Lesser General Public License (LGPL) version 3.<br>"
+        "Copyright (C) 2024 The Qt Company Ltd and other contributors.<br>"
+        "(<a href=\"https://www.qt.io/licensing/\">https://www.qt.io/licensing/</a>)</p>";
+
+    QMessageBox::about(this, "About TwitchCommentManager", aboutText);
 }
