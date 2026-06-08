@@ -1,6 +1,8 @@
 # CMake & Build
 build/
 build-*/
+build_release/
+*.zip
 out/
 bin/
 *.exe
