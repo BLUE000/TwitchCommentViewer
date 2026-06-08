@@ -2,6 +2,7 @@
 #include <QStatusBar>
 #include <QByteArray>
 #include "MainWindow.h"
+#include "AppController.h"
 #include <TrustChainCore.hpp>
 #include <cipher_engine.h>
 
@@ -59,6 +60,10 @@ int main(int argc, char *argv[])
             statusBar->setVisible(true);
         }
     }
+
+    // AppController の初期化と稼働開始
+    AppController appController;
+    appController.initialize();
 
     w.show();
     return a.exec();

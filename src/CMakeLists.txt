@@ -9,6 +9,11 @@ set(SOURCES
     MainWindow.ui
     modules/DatabaseManager.cpp
     modules/DatabaseManager.h
+    modules/TwitchEventCollectorImpl.cpp
+    modules/TwitchEventCollectorImpl.h
+    events/TwitchEvents.h
+    AppController.cpp
+    AppController.h
 )
 
 add_executable(TwitchCommentManager ${SOURCES})
@@ -30,6 +35,7 @@ target_link_libraries(TwitchCommentManager PRIVATE
     Qt6::Widgets
     Qt6::Network
     Qt6::Sql
+    Qt6::WebSockets
     trustchain
     TransCipher
 )
