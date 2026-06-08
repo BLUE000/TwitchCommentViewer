@@ -13,7 +13,8 @@ ConfigManager::ConfigManager(QObject* parent)
     : QObject(parent), m_httpServer(new QTcpServer(this)) 
 {
     // アプリケーション起動ごとのセキュアな固定鍵 (実運用ではOSのKeychain等から取得するのが理想)
-    m_cipherKey = "twitch_oauth_secure_key";
+    // v2: スコープ変更に伴い、旧バージョンのトークンを無効化して再認証を強制する
+    m_cipherKey = "twitch_oauth_secure_key_v2";
 
     connect(m_httpServer, &QTcpServer::newConnection, this, &ConfigManager::onNewConnection);
 }
@@ -66,11 +67,12 @@ void ConfigManager::startOAuthFlow() {
     }
 
     // ブラウザを開いてTwitchの認証画面へ誘導 (Implicit Grant Flow)
+    // ※ EventSub のチャット取得には user:read:chat スコープが必須
     QString authUrl = QString("https://id.twitch.tv/oauth2/authorize"
                               "?response_type=token"
                               "&client_id=%1"
                               "&redirect_uri=%2"
-                              "&scope=chat:read chat:edit")
+                              "&scope=user:read:chat user:write:chat")
                           .arg(m_clientId)
                           .arg(m_redirectUri);
                           
