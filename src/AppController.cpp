@@ -1,6 +1,7 @@
 #include "AppController.h"
 #include "modules/TwitchEventCollectorImpl.h"
 #include "events/TwitchEvents.h"
+#include "MainWindow.h"
 #include <QDebug>
 
 AppController::AppController(QObject* parent) : QObject(parent) {
@@ -37,8 +38,13 @@ void AppController::initialize() {
             }
         });
         
-        // 認証フロー開始（必要ならブラウザが開く）
-        m_configManager->startOAuthFlow();
+        // UIの認証ボタンが押されたらフローを開始する
+        if (m_mainWindow) {
+            connect(m_mainWindow, &MainWindow::authRequested, this, [this]() {
+                qInfo() << "Auth requested from UI. Starting OAuth Flow...";
+                m_configManager->startOAuthFlow();
+            });
+        }
     } else {
         qWarning() << "config.json could not be loaded. Missing Client ID.";
     }
@@ -71,7 +77,13 @@ void AppController::customEvent(QEvent* event) {
                                 commentEvent->message(), 
                                 sentiment, isSpam);
         
-        // TODO: UIへの反映処理など
+        // UIへの反映処理
+        if (m_mainWindow) {
+            // QtのGUIスレッドから安全にUIを更新
+            QMetaObject::invokeMethod(m_mainWindow, [this, name = commentEvent->userName(), msg = commentEvent->message()]() {
+                m_mainWindow->addCommentToView(name, msg);
+            }, Qt::QueuedConnection);
+        }
     } else {
         QObject::customEvent(event);
     }

@@ -63,6 +63,7 @@ int main(int argc, char *argv[])
 
     // AppController の初期化と稼働開始
     AppController appController;
+    appController.setMainWindow(&w);
     appController.initialize();
 
     w.show();
