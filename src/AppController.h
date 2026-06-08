@@ -5,6 +5,7 @@
 #include "interfaces/ITwitchEventCollector.h"
 #include "modules/DatabaseManager.h"
 #include "modules/ConfigManager.h"
+#include "interfaces/IBouyomiIntegration.h"
 
 class MainWindow;
 
@@ -26,4 +27,5 @@ private:
     std::unique_ptr<ConfigManager> m_configManager;
     std::unique_ptr<ITwitchEventCollector> m_twitchCollector;
     std::unique_ptr<DatabaseManager> m_dbManager;
+    std::unique_ptr<IBouyomiIntegration> m_bouyomiIntegration;
 };

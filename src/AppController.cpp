@@ -1,5 +1,6 @@
 #include "AppController.h"
 #include "modules/TwitchEventCollectorImpl.h"
+#include "modules/BouyomiIntegrationImpl.h"
 #include "events/TwitchEvents.h"
 #include "MainWindow.h"
 #include <QDebug>
@@ -10,6 +11,7 @@ AppController::AppController(QObject* parent) : QObject(parent) {
     // 自身のインスタンスをイベントターゲットとして渡す
     m_twitchCollector = std::make_unique<TwitchEventCollectorImpl>(this);
     m_dbManager = std::make_unique<DatabaseManager>();
+    m_bouyomiIntegration = std::make_unique<BouyomiIntegrationImpl>(this);
 }
 
 AppController::~AppController() {
@@ -77,6 +79,12 @@ void AppController::customEvent(QEvent* event) {
                                 commentEvent->message(), 
                                 sentiment, isSpam);
         
+        // 棒読みちゃん連携 (スパム判定が入った場合はスキップするなど後で追加可能)
+        if (!isSpam) {
+            // 例: 「ユーザー名、メッセージ」の形式で読ませる
+            m_bouyomiIntegration->sendText(commentEvent->userName() + "、" + commentEvent->message());
+        }
+
         // UIへの反映処理
         if (m_mainWindow) {
             // QtのGUIスレッドから安全にUIを更新

@@ -16,6 +16,8 @@ set(SOURCES
     AppController.h
     modules/ConfigManager.cpp
     modules/ConfigManager.h
+    modules/BouyomiIntegrationImpl.cpp
+    modules/BouyomiIntegrationImpl.h
 )
 
 add_executable(TwitchCommentManager ${SOURCES})
