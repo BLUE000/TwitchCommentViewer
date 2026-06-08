@@ -257,8 +257,13 @@ void MainWindow::on_btnReadme_clicked() {
 }
 
 void MainWindow::on_btnAbout_clicked() {
+    QString versionStr = "1.0.0";
+#ifdef APP_VERSION
+    versionStr = QString(APP_VERSION);
+#endif
+
     QString aboutText = 
-        "<h2>TwitchCommentManager</h2>"
+        QString("<h2>TwitchCommentManager v%1</h2>").arg(versionStr) +
         "<p>Copyright (c) 2026 BLUE000</p>"
         "<h3>サードパーティ・ライセンス</h3>"
         "<p>本ソフトウェアは、以下のオープンソースライブラリおよびセキュリティモジュールを利用しています。</p>"

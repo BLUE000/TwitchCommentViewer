@@ -57,6 +57,7 @@ target_link_libraries(TwitchCommentManager PRIVATE
 target_compile_definitions(TwitchCommentManager PRIVATE
     WATERMARK_ENCRYPTED_TEXT="${TRUSTCHAIN_DEFAULT_CREATOR}"
     WATERMARK_DECRYPT_KEY="${TRUSTCHAIN_WATERMARK_KEY}"
+    APP_VERSION="${TwitchCommentManager_VERSION}"
 )
 
 # DLLコピー設定
