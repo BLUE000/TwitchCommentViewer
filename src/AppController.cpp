@@ -60,7 +60,7 @@ void AppController::initialize() {
 }
 
 void AppController::customEvent(QEvent* event) {
-    if (event->type() == TwitchEvents::CommentReceivedType) {
+    if (event->type() == TwitchEvents::commentReceivedType()) {
         auto* commentEvent = static_cast<TwitchEvents::CommentEvent*>(event);
         
         qInfo() << "AppController received Event Interrupt!" 
