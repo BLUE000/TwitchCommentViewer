@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Twitch Comment Overlay</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="comment-container"></div>
+
+    <script>
+        // WebSocketサーバーに接続
+        const ws = new WebSocket('ws://localhost:8080');
+
+        ws.onopen = () => {
+            console.log('Connected to OBS WebSocket Server');
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            
+            if (data.action === 'comment') {
+                addComment(data.username, data.message);
+            }
+        };
+
+        function addComment(username, message) {
+            const container = document.getElementById('comment-container');
+            
+            // コメント要素の作成
+            const commentDiv = document.createElement('div');
+            commentDiv.className = 'comment slide-in';
+            
+            // ユーザー名
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'username';
+            nameSpan.textContent = username;
+            
+            // 区切り
+            const separator = document.createTextNode(': ');
+            
+            // メッセージ内容
+            const msgSpan = document.createElement('span');
+            msgSpan.className = 'message';
+            msgSpan.textContent = message;
+            
+            // 組み立て
+            commentDiv.appendChild(nameSpan);
+            commentDiv.appendChild(separator);
+            commentDiv.appendChild(msgSpan);
+            
+            // コンテナに追加
+            container.appendChild(commentDiv);
+            
+            // 古いコメントを削除 (最大表示数20件など)
+            if (container.children.length > 20) {
+                container.removeChild(container.firstChild);
+            }
+            
+            // 自動スクロール
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+    </script>
+</body>
+</html>

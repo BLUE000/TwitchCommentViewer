@@ -62,7 +62,7 @@ void BouyomiIntegrationImpl::sendText(const QString& text) {
 
 void BouyomiIntegrationImpl::checkAndStartProcess() {
     if (!m_config) return;
-    if (!m_config->bouyomiAutoStart()) return;
+    if (!m_config->getBouyomiAutoStart()) return;
     
     QString exePath = m_config->bouyomiExePath();
     if (exePath.isEmpty()) return;
@@ -75,7 +75,7 @@ void BouyomiIntegrationImpl::checkAndStartProcess() {
 
 void BouyomiIntegrationImpl::stopProcess() {
     if (!m_config) return;
-    if (!m_config->bouyomiAutoStop()) return;
+    if (!m_config->getBouyomiAutoStop()) return;
     
     if (m_process->state() != QProcess::NotRunning) {
         qInfo() << "Stopping Bouyomi-chan...";

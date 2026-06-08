@@ -13,6 +13,10 @@ set(SOURCES
     modules/TwitchEventCollectorImpl.h
     modules/CommentAnalyzer.cpp
     modules/CommentAnalyzer.h
+    modules/ObsFileIntegrationImpl.cpp
+    modules/ObsFileIntegrationImpl.h
+    modules/ObsWebSocketServer.cpp
+    modules/ObsWebSocketServer.h
     events/TwitchEvents.h
     AppController.cpp
     AppController.h
@@ -64,6 +68,13 @@ add_custom_command(TARGET TwitchCommentManager POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_SOURCE_DIR}/config.json"
         "$<TARGET_FILE_DIR:TwitchCommentManager>/config.json"
+)
+
+# assets/overlayディレクトリをビルドディレクトリにコピー
+add_custom_command(TARGET TwitchCommentManager POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/assets/overlay"
+        "$<TARGET_FILE_DIR:TwitchCommentManager>/assets/overlay"
 )
 
 # QtのDLLとプラグイン(qwindows.dll等)をビルドディレクトリに自動コピーする

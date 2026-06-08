@@ -47,15 +47,26 @@ bool ConfigManager::loadConfig() {
     else if (json.contains("redirectUri")) m_redirectUri = json["redirectUri"].toString();
     
     // 棒読みちゃん設定の読み込み
-    if (json.contains("bouyomiHost")) m_bouyomiHost = json["bouyomiHost"].toString();
-    if (json.contains("bouyomiPort")) m_bouyomiPort = json["bouyomiPort"].toInt();
-    if (json.contains("bouyomiExePath")) m_bouyomiExePath = json["bouyomiExePath"].toString();
-    if (json.contains("bouyomiVoice")) m_bouyomiVoice = json["bouyomiVoice"].toInt();
-    if (json.contains("bouyomiVolume")) m_bouyomiVolume = json["bouyomiVolume"].toInt();
-    if (json.contains("bouyomiAutoStart")) m_bouyomiAutoStart = json["bouyomiAutoStart"].toBool();
-    if (json.contains("bouyomiAutoStop")) m_bouyomiAutoStop = json["bouyomiAutoStop"].toBool();
+    QJsonObject bouyomiObj = json["bouyomi"].toObject();
+    if (bouyomiObj.contains("bouyomiHost")) m_bouyomiHost = bouyomiObj["bouyomiHost"].toString();
+    if (bouyomiObj.contains("bouyomiPort")) m_bouyomiPort = bouyomiObj["bouyomiPort"].toInt();
+    if (bouyomiObj.contains("bouyomiExePath")) m_bouyomiExePath = bouyomiObj["bouyomiExePath"].toString();
+    if (bouyomiObj.contains("bouyomiVoice")) m_bouyomiVoice = bouyomiObj["bouyomiVoice"].toInt();
+    if (bouyomiObj.contains("bouyomiVolume")) m_bouyomiVolume = bouyomiObj["bouyomiVolume"].toInt();
+    if (bouyomiObj.contains("bouyomiAutoStart")) m_bouyomiAutoStart = bouyomiObj["bouyomiAutoStart"].toBool();
+    if (bouyomiObj.contains("auto_stop")) {
+        m_bouyomiAutoStop = bouyomiObj["auto_stop"].toBool();
+    }
+    
+    QJsonObject obsObj = json["obs"].toObject();
+    if (obsObj.contains("file_output")) {
+        m_obsFileOutputEnabled = obsObj["file_output"].toBool();
+    }
+    if (obsObj.contains("websocket")) {
+        m_obsWebSocketEnabled = obsObj["websocket"].toBool();
+    }
 
-    // 保存されているトークンがあれば読み込む
+    // 認証情報の復号化と読み込み
     loadToken();
 
     return !m_clientId.isEmpty() && !m_redirectUri.isEmpty();
@@ -69,19 +80,27 @@ void ConfigManager::saveConfig() {
         return;
     }
 
-    QJsonObject json;
-    json["twitch_client_id"] = m_clientId;
-    json["twitch_redirect_uri"] = m_redirectUri;
+    QJsonObject rootObj;
+    rootObj["twitch_client_id"] = m_clientId;
+    rootObj["twitch_redirect_uri"] = m_redirectUri;
     
-    json["bouyomiHost"] = m_bouyomiHost;
-    json["bouyomiPort"] = m_bouyomiPort;
-    json["bouyomiExePath"] = m_bouyomiExePath;
-    json["bouyomiVoice"] = m_bouyomiVoice;
-    json["bouyomiVolume"] = m_bouyomiVolume;
-    json["bouyomiAutoStart"] = m_bouyomiAutoStart;
-    json["bouyomiAutoStop"] = m_bouyomiAutoStop;
+    QJsonObject bouyomiObj;
+    bouyomiObj["bouyomiHost"] = m_bouyomiHost;
+    bouyomiObj["bouyomiPort"] = m_bouyomiPort;
+    bouyomiObj["bouyomiExePath"] = m_bouyomiExePath;
+    bouyomiObj["bouyomiVoice"] = m_bouyomiVoice;
+    bouyomiObj["bouyomiVolume"] = m_bouyomiVolume;
+    bouyomiObj["auto_start"] = m_bouyomiAutoStart;
+    bouyomiObj["auto_stop"] = m_bouyomiAutoStop;
+    rootObj["bouyomi"] = bouyomiObj;
 
-    QJsonDocument doc(json);
+    QJsonObject obsObj;
+    obsObj["file_output"] = m_obsFileOutputEnabled;
+    obsObj["websocket"] = m_obsWebSocketEnabled;
+    rootObj["obs"] = obsObj;
+
+    // トークン情報の暗号化と保存
+    QJsonDocument doc(rootObj);
     file.write(doc.toJson());
 }
 
@@ -209,6 +228,38 @@ void ConfigManager::saveToken(const QString& token) {
             file.write(res.data());
         }
     }
+}
+
+bool ConfigManager::getBouyomiAutoStart() const {
+    return m_bouyomiAutoStart;
+}
+
+void ConfigManager::setBouyomiAutoStart(bool autoStart) {
+    m_bouyomiAutoStart = autoStart;
+}
+
+bool ConfigManager::getBouyomiAutoStop() const {
+    return m_bouyomiAutoStop;
+}
+
+void ConfigManager::setBouyomiAutoStop(bool autoStop) {
+    m_bouyomiAutoStop = autoStop;
+}
+
+bool ConfigManager::getObsFileOutputEnabled() const {
+    return m_obsFileOutputEnabled;
+}
+
+void ConfigManager::setObsFileOutputEnabled(bool enabled) {
+    m_obsFileOutputEnabled = enabled;
+}
+
+bool ConfigManager::getObsWebSocketEnabled() const {
+    return m_obsWebSocketEnabled;
+}
+
+void ConfigManager::setObsWebSocketEnabled(bool enabled) {
+    m_obsWebSocketEnabled = enabled;
 }
 
 bool ConfigManager::loadToken() {

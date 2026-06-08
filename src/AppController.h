@@ -5,6 +5,7 @@
 #include "interfaces/ITwitchEventCollector.h"
 #include "interfaces/IBouyomiIntegration.h"
 #include "interfaces/ICommentAnalyzer.h"
+#include "interfaces/IObsIntegration.h"
 #include "events/TwitchEvents.h"
 #include "modules/DatabaseManager.h"
 #include "modules/ConfigManager.h"
@@ -29,6 +30,8 @@ private:
     std::unique_ptr<ConfigManager> m_configManager;
     std::unique_ptr<ITwitchEventCollector> m_twitchCollector;
     std::unique_ptr<IBouyomiIntegration> m_bouyomiIntegration;
+    std::unique_ptr<IObsIntegration> m_obsFileIntegration;
+    std::unique_ptr<IObsIntegration> m_obsWsIntegration;
     std::unique_ptr<ICommentAnalyzer> m_commentAnalyzer;
     std::unique_ptr<DatabaseManager> m_dbManager;
     

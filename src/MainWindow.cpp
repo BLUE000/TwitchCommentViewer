@@ -54,8 +54,11 @@ void MainWindow::setConfigManager(ConfigManager* configManager) {
     }
     
     ui->spinBouyomiVolume->setValue(m_configManager->bouyomiVolume());
-    ui->chkBouyomiAutoStart->setChecked(m_configManager->bouyomiAutoStart());
-    ui->chkBouyomiAutoStop->setChecked(m_configManager->bouyomiAutoStop());
+    ui->chkBouyomiAutoStart->setChecked(m_configManager->getBouyomiAutoStart());
+    ui->chkBouyomiAutoStop->setChecked(m_configManager->getBouyomiAutoStop());
+
+    ui->chkObsFileOutput->setChecked(m_configManager->getObsFileOutputEnabled());
+    ui->chkObsWebSocket->setChecked(m_configManager->getObsWebSocketEnabled());
 }
 
 void MainWindow::on_btnBrowseBouyomi_clicked() {
@@ -90,4 +93,12 @@ void MainWindow::on_btnTestBouyomi_clicked() {
 
 void MainWindow::appendAnalysisLog(const QString& logMsg) {
     ui->textBrowserAnalysis->append(logMsg);
+}
+
+void MainWindow::on_btnSaveObs_clicked() {
+    if (m_configManager) {
+        m_configManager->setObsFileOutputEnabled(ui->chkObsFileOutput->isChecked());
+        m_configManager->setObsWebSocketEnabled(ui->chkObsWebSocket->isChecked());
+        m_configManager->saveConfig();
+    }
 }

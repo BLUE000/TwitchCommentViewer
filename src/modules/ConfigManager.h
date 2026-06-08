@@ -35,12 +35,18 @@ public:
     int bouyomiVolume() const { return m_bouyomiVolume; }
     void setBouyomiVolume(int volume) { m_bouyomiVolume = volume; }
     
-    bool bouyomiAutoStart() const { return m_bouyomiAutoStart; }
-    void setBouyomiAutoStart(bool autoStart) { m_bouyomiAutoStart = autoStart; }
-    
-    bool bouyomiAutoStop() const { return m_bouyomiAutoStop; }
-    void setBouyomiAutoStop(bool autoStop) { m_bouyomiAutoStop = autoStop; }
+    bool getBouyomiAutoStart() const;
+    void setBouyomiAutoStart(bool autoStart);
+    bool getBouyomiAutoStop() const;
+    void setBouyomiAutoStop(bool autoStop);
 
+    // OBS連携設定
+    bool getObsFileOutputEnabled() const;
+    void setObsFileOutputEnabled(bool enabled);
+    bool getObsWebSocketEnabled() const;
+    void setObsWebSocketEnabled(bool enabled);
+
+    // 認証情報
     void saveConfig(); // 設定保存用メソッド
 
 signals:
@@ -63,9 +69,12 @@ private:
     int m_bouyomiPort = 50001;
     QString m_bouyomiExePath = "";
     int m_bouyomiVoice = 0;
-    int m_bouyomiVolume = 100;
+    int m_bouyomiVolume = -1;
     bool m_bouyomiAutoStart = false;
     bool m_bouyomiAutoStop = false;
+
+    bool m_obsFileOutputEnabled = false;
+    bool m_obsWebSocketEnabled = false;
 
     QTcpServer* m_httpServer;
 

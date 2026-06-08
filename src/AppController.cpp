@@ -1,6 +1,8 @@
 #include "AppController.h"
 #include "modules/TwitchEventCollectorImpl.h"
 #include "modules/BouyomiIntegrationImpl.h"
+#include "modules/ObsFileIntegrationImpl.h"
+#include "modules/ObsWebSocketServer.h"
 #include "modules/CommentAnalyzer.h"
 #include "events/TwitchEvents.h"
 #include "MainWindow.h"
@@ -13,6 +15,10 @@ AppController::AppController(QObject* parent) : QObject(parent) {
     m_twitchCollector = std::make_unique<TwitchEventCollectorImpl>(this);
     m_dbManager = std::make_unique<DatabaseManager>();
     m_bouyomiIntegration = std::make_unique<BouyomiIntegrationImpl>(m_configManager.get(), this);
+    
+    // OBS連携モジュールの初期化
+    m_obsFileIntegration = std::make_unique<ObsFileIntegrationImpl>(this);
+    m_obsWsIntegration = std::make_unique<ObsWebSocketServer>(8080, this);
     
     // コメントアナライザーの初期化とシグナル接続
     auto analyzer = std::make_unique<CommentAnalyzer>(this);
@@ -110,6 +116,18 @@ void AppController::customEvent(QEvent* event) {
         if (!isSpam) {
             // 例: 「ユーザー名、メッセージ」の形式で読ませる
             m_bouyomiIntegration->sendText(commentEvent->userName() + "、" + safeMessage);
+            
+            // OBS連携 (ONに設定されているもののみ実行)
+            QVariantMap obsPayload;
+            obsPayload["username"] = commentEvent->userName();
+            obsPayload["message"] = safeMessage;
+            
+            if (m_configManager->getObsFileOutputEnabled() && m_obsFileIntegration) {
+                m_obsFileIntegration->sendAction("comment", obsPayload);
+            }
+            if (m_configManager->getObsWebSocketEnabled() && m_obsWsIntegration) {
+                m_obsWsIntegration->sendAction("comment", obsPayload);
+            }
         }
 
         // UIへの反映処理

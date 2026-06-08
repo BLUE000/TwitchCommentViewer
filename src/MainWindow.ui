@@ -170,6 +170,30 @@
          </widget>
         </item>
         <item>
+         <widget class="QGroupBox" name="groupBoxObs">
+          <property name="title">
+           <string>OBS連携設定</string>
+          </property>
+          <layout class="QVBoxLayout" name="verticalLayoutObs">
+           <item>
+            <widget class="QCheckBox" name="chkObsFileOutput">
+             <property name="text"><string>コメントをテキストファイルに出力する</string></property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="chkObsWebSocket">
+             <property name="text"><string>OBSブラウザソース連携（WebSocketサーバー）を有効にする</string></property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btnSaveObs">
+             <property name="text"><string>OBS設定を保存</string></property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
          <spacer name="verticalSpacer">
           <property name="orientation">
            <enum>Qt::Vertical</enum>
