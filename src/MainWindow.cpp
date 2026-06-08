@@ -114,3 +114,13 @@ void MainWindow::on_btnCopyObsUrl_clicked() {
     QClipboard *clipboard = QGuiApplication::clipboard();
     clipboard->setText(ui->editObsUrl->text());
 }
+
+void MainWindow::on_btnToggleBouyomi_toggled(bool checked) {
+    ui->groupBoxBouyomi->setVisible(checked);
+    ui->btnToggleBouyomi->setText(checked ? "▼ 棒読みちゃん連携設定" : "▶ 棒読みちゃん連携設定");
+}
+
+void MainWindow::on_btnToggleObs_toggled(bool checked) {
+    ui->groupBoxObs->setVisible(checked);
+    ui->btnToggleObs->setText(checked ? "▼ OBS連携設定" : "▶ OBS連携設定");
+}

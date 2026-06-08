@@ -33,6 +33,9 @@ private slots:
     void on_btnTestBouyomi_clicked();
     void on_btnSaveObs_clicked();
     void on_btnCopyObsUrl_clicked();
+    
+    void on_btnToggleBouyomi_toggled(bool checked);
+    void on_btnToggleObs_toggled(bool checked);
 
 public slots:
     void appendAnalysisLog(const QString& logMsg);

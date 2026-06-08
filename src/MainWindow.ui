@@ -52,11 +52,7 @@
           </property>
          </widget>
         </item>
-        <item><widget class="QToolBox" name="toolBoxSettings"><property name="currentIndex"><number>0</number></property><widget class="QWidget" name="pageBouyomi"><attribute name="label"><string>▼ 棒読みちゃん連携設定</string></attribute><layout class="QVBoxLayout" name="verticalLayoutBouyomi"><item>
-         <widget class="QGroupBox" name="groupBoxBouyomi">
-          <property name="title">
-           <string>棒読みちゃん連携設定</string>
-          </property>
+        <item><widget class="QPushButton" name="btnToggleBouyomi"><property name="text"><string>▼ 棒読みちゃん連携設定</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="styleSheet"><string>text-align: left; font-weight: bold; padding: 5px;</string></property></widget></item><item><widget class="QGroupBox" name="groupBoxBouyomi">
           <layout class="QFormLayout" name="formLayout">
            <item row="0" column="0">
             <widget class="QLabel" name="labelHost">
@@ -168,12 +164,7 @@
            </item>
           </layout>
          </widget>
-        </item>
-        </layout></widget><widget class="QWidget" name="pageObs"><attribute name="label"><string>▼ OBS連携設定</string></attribute><layout class="QVBoxLayout" name="verticalLayoutObsContainer"><item>
-         <widget class="QGroupBox" name="groupBoxObs">
-          <property name="title">
-           <string>OBS連携設定</string>
-          </property>
+        </item><item><widget class="QPushButton" name="btnToggleObs"><property name="text"><string>▼ OBS連携設定</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="styleSheet"><string>text-align: left; font-weight: bold; padding: 5px;</string></property></widget></item><item><widget class="QGroupBox" name="groupBoxObs">
           <layout class="QVBoxLayout" name="verticalLayoutObs">
            <item>
             <widget class="QCheckBox" name="chkObsFileOutput">
@@ -192,8 +183,7 @@
            </item>
           </layout>
          </widget>
-        </item>
-        </layout></widget></widget></item><item>
+        </item><item>
          <spacer name="verticalSpacer">
           <property name="orientation">
            <enum>Qt::Vertical</enum>
