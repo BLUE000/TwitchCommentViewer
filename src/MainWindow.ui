@@ -35,7 +35,7 @@
         <string>解析</string>
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout_3">
-        <item><widget class="QTabWidget" name="tabWidgetAnalysis"><property name="tabPosition"><enum>QTabWidget::West</enum></property><widget class="QWidget" name="tabLog"><attribute name="title"><string>解析ログ</string></attribute><layout class="QVBoxLayout" name="verticalLayout_log"><item><widget class="QTextBrowser" name="textBrowserAnalysis" /></item></layout></widget><widget class="QWidget" name="tabStats"><attribute name="title"><string>コメント集計</string></attribute><layout class="QVBoxLayout" name="verticalLayout_stats"><item><layout class="QHBoxLayout" name="horizontalLayout_stats_ctrl"><item><widget class="QComboBox" name="comboGraphType"><item><property name="text"><string>総コメント数推移</string></property></item><item><property name="text"><string>ユーザーごとの推移</string></property></item></widget></item><item><widget class="QComboBox" name="comboGranularity"><item><property name="text"><string>自動</string></property></item><item><property name="text"><string>5秒</string></property></item><item><property name="text"><string>10秒</string></property></item><item><property name="text"><string>30秒</string></property></item><item><property name="text"><string>1分</string></property></item><item><property name="text"><string>5分</string></property></item></widget></item><item><widget class="QComboBox" name="comboTopN"><item><property name="text"><string>TOP 3</string></property></item><item><property name="text"><string>TOP 5</string></property></item><item><property name="text"><string>TOP 10</string></property></item><item><property name="text"><string>全員表示 (100人以下)</string></property></item><property name="currentIndex"><number>2</number></property></widget></item><item><spacer name="horizontalSpacer_stats"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item></layout></item><item><widget class="QChartView" name="chartView"><property name="minimumSize"><size><width>0</width><height>200</height></size></property><property name="maximumSize"><size><width>16777215</width><height>300</height></size></property></widget></item><item><widget class="QLabel" name="labelTotalComments"><property name="text"><string>総コメント数: 0</string></property><property name="font"><font><pointsize>14</pointsize><bold>true</bold></font></property></widget></item><item><widget class="QTableWidget" name="tableUserStats"><property name="maximumSize"><size><width>16777215</width><height>200</height></size></property></widget></item></layout></widget></widget></item></layout>
+        <item><widget class="QTabWidget" name="tabWidgetAnalysis"><property name="tabPosition"><enum>QTabWidget::West</enum></property><widget class="QWidget" name="tabLog"><attribute name="title"><string>解析ログ</string></attribute><layout class="QVBoxLayout" name="verticalLayout_log"><item><widget class="QTextBrowser" name="textBrowserAnalysis" /></item></layout></widget><widget class="QWidget" name="tabStats"><attribute name="title"><string>コメント集計</string></attribute><layout class="QVBoxLayout" name="verticalLayout_stats"><item><layout class="QHBoxLayout" name="horizontalLayout_stats_ctrl"><item><widget class="QComboBox" name="comboGraphType"><item><property name="text"><string>総コメント数推移</string></property></item><item><property name="text"><string>ユーザーごとの推移</string></property></item></widget></item><item><widget class="QComboBox" name="comboGranularity"><item><property name="text"><string>自動</string></property></item><item><property name="text"><string>5秒</string></property></item><item><property name="text"><string>10秒</string></property></item><item><property name="text"><string>30秒</string></property></item><item><property name="text"><string>1分</string></property></item><item><property name="text"><string>5分</string></property></item></widget></item><item><widget class="QComboBox" name="comboTopN"><item><property name="text"><string>TOP 3</string></property></item><item><property name="text"><string>TOP 5</string></property></item><item><property name="text"><string>TOP 10</string></property></item><item><property name="text"><string>全員表示 (100人以下)</string></property></item><property name="currentIndex"><number>2</number></property></widget></item><item><spacer name="horizontalSpacer_stats"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item></layout></item><item><widget class="QChartView" name="chartView"><property name="minimumSize"><size><width>0</width><height>200</height></size></property><property name="maximumSize"><size><width>16777215</width><height>300</height></size></property></widget></item><item><widget class="QLabel" name="labelTotalComments"><property name="text"><string>総コメント数: 0</string></property><property name="font"><font><pointsize>14</pointsize><bold>true</bold></font></property><property name="maximumSize"><size><width>16777215</width><height>30</height></size></property></widget></item><item><widget class="QTableWidget" name="tableUserStats"><property name="maximumSize"><size><width>16777215</width><height>200</height></size></property></widget></item></layout></widget></widget></item></layout>
       </widget>
       <widget class="QWidget" name="tabSettings">
        <attribute name="title">
@@ -43,12 +43,19 @@
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout_4">
         <item>
-         <widget class="QPushButton" name="btnStartAuth">
-          <property name="text">
-           <string>Twitch 連携を開始 (OAuth認証)</string>
-          </property>
-         </widget>
-        </item>
+         <widget class="QScrollArea" name="scrollAreaSettings">
+          <property name="widgetResizable"><bool>true</bool></property>
+          <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+          <widget class="QWidget" name="scrollAreaWidgetContents">
+           <property name="geometry"><rect><x>0</x><y>0</y><width>780</width><height>600</height></rect></property>
+           <layout class="QVBoxLayout" name="verticalLayoutSettingsInner">
+            <item>
+             <widget class="QPushButton" name="btnStartAuth">
+              <property name="text">
+               <string>Twitch 連携を開始 (OAuth認証)</string>
+              </property>
+             </widget>
+            </item>
         <item><widget class="QPushButton" name="btnToggleBouyomi"><property name="text"><string>▼ 棒読みちゃん連携設定</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="styleSheet"><string>text-align: left; font-weight: bold; padding: 5px;</string></property></widget></item><item><widget class="QGroupBox" name="groupBoxBouyomi">
           <layout class="QFormLayout" name="formLayout">
            <item row="0" column="0">
@@ -180,18 +187,22 @@
            </item>
           </layout>
          </widget>
-        </item><item><widget class="QPushButton" name="btnToggleBot"><property name="text"><string>▼ 解析・集計設定 (ボット除外)</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="styleSheet"><string>text-align: left; font-weight: bold; padding: 5px;</string></property></widget></item><item><widget class="QGroupBox" name="groupBoxBot"><layout class="QVBoxLayout" name="verticalLayoutBot"><item><widget class="QLabel" name="labelBot"><property name="text"><string>除外するボットユーザー名 (カンマ区切り):</string></property></widget></item><item><widget class="QLineEdit" name="editBotUsers"><property name="placeholderText"><string>Nightbot, Moobot, StreamElements</string></property></widget></item><item><widget class="QPushButton" name="btnSaveBot"><property name="text"><string>解析設定を保存</string></property></widget></item></layout></widget></item><item><widget class="QPushButton" name="btnToggleDb"><property name="text"><string>▼ データベース管理 (履歴クリア)</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="styleSheet"><string>text-align: left; font-weight: bold; padding: 5px;</string></property></widget></item><item><widget class="QGroupBox" name="groupBoxDb"><layout class="QHBoxLayout" name="horizontalLayoutDb"><item><widget class="QPushButton" name="btnLaunchDbViewer"><property name="text"><string>データベースビューアを起動</string></property><property name="minimumHeight"><number>30</number></property></widget></item></layout></widget></item><item>
-         <spacer name="verticalSpacer">
-          <property name="orientation">
-           <enum>Qt::Vertical</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>20</width>
-            <height>40</height>
-           </size>
-          </property>
-         </spacer>
+        </item><item><widget class="QPushButton" name="btnToggleBot"><property name="text"><string>▼ 解析・集計設定 (ボット除外)</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="styleSheet"><string>text-align: left; font-weight: bold; padding: 5px;</string></property></widget></item><item><widget class="QGroupBox" name="groupBoxBot"><layout class="QVBoxLayout" name="verticalLayoutBot"><item><widget class="QLabel" name="labelBot"><property name="text"><string>除外するボットユーザー名 (カンマ区切り):</string></property></widget></item><item><widget class="QLineEdit" name="editBotUsers"><property name="placeholderText"><string>Nightbot, Moobot, StreamElements</string></property></widget></item><item><widget class="QPushButton" name="btnSaveBot"><property name="text"><string>解析設定を保存</string></property></widget></item></layout></widget></item><item><widget class="QPushButton" name="btnToggleDb"><property name="text"><string>▼ データベース管理 (履歴クリア)</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="styleSheet"><string>text-align: left; font-weight: bold; padding: 5px;</string></property></widget></item><item><widget class="QGroupBox" name="groupBoxDb"><layout class="QHBoxLayout" name="horizontalLayoutDb"><item><widget class="QPushButton" name="btnLaunchDbViewer"><property name="text"><string>データベースビューアを起動</string></property><property name="minimumHeight"><number>30</number></property></widget></item></layout></widget></item>            <item>
+             <spacer name="verticalSpacer">
+              <property name="orientation">
+               <enum>Qt::Vertical</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>20</width>
+                <height>40</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </widget>
+         </widget>
         </item>
        </layout>
       </widget>
