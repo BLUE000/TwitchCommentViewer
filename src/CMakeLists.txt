@@ -7,6 +7,8 @@ set(SOURCES
     MainWindow.cpp
     MainWindow.h
     MainWindow.ui
+    modules/DatabaseManager.cpp
+    modules/DatabaseManager.h
 )
 
 add_executable(TwitchCommentManager ${SOURCES})
@@ -15,7 +17,11 @@ add_executable(TwitchCommentManager ${SOURCES})
 trustchain_setup_target(TwitchCommentManager)
 
 # TransCipher headers and lib
-target_include_directories(TwitchCommentManager PRIVATE ${CMAKE_SOURCE_DIR}/lib/TransCipher-Dist/include)
+target_include_directories(TwitchCommentManager PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}/interfaces
+    ${CMAKE_CURRENT_SOURCE_DIR}/modules
+    ${CMAKE_SOURCE_DIR}/lib/TransCipher-Dist/include
+)
 target_link_directories(TwitchCommentManager PRIVATE ${CMAKE_SOURCE_DIR}/lib/TransCipher-Dist/lib)
 
 target_link_libraries(TwitchCommentManager PRIVATE

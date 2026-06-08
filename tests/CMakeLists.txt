@@ -11,16 +11,22 @@ enable_testing()
 
 add_executable(UnitTests 
     test_main.cpp
+    ${CMAKE_SOURCE_DIR}/src/modules/DatabaseManager.cpp
 )
 
-target_include_directories(UnitTests PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_include_directories(UnitTests PRIVATE ${CMAKE_SOURCE_DIR}/lib/TransCipher-Dist/include)
+target_include_directories(UnitTests PRIVATE 
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/interfaces
+    ${CMAKE_SOURCE_DIR}/src/modules
+    ${CMAKE_SOURCE_DIR}/lib/TransCipher-Dist/include
+)
 target_link_directories(UnitTests PRIVATE ${CMAKE_SOURCE_DIR}/lib/TransCipher-Dist/lib)
 
 target_link_libraries(UnitTests PRIVATE
-    gtest_main
+    gtest
     Qt6::Core
     Qt6::Network
+    Qt6::Sql
     TransCipher
 )
 
