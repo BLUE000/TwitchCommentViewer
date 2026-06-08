@@ -38,7 +38,6 @@ add_custom_command(TARGET UnitTests POST_BUILD
 )
 
 include(GoogleTest)
-gtest_discover_tests(UnitTests)
 
 # QtのDLLとプラグイン(qsqlite.dll等)をテストフォルダにもコピー
 if(WIN32)
@@ -49,3 +48,5 @@ if(WIN32)
         )
     endif()
 endif()
+
+gtest_discover_tests(UnitTests)
