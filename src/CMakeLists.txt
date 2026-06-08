@@ -28,7 +28,7 @@ set(SOURCES
     modules/BouyomiIntegrationImpl.h
 )
 
-add_executable(TwitchCommentManager ${SOURCES})
+add_executable(TwitchCommentManager WIN32 ${SOURCES})
 
 # TrustChain setup (as per documentation)
 trustchain_setup_target(TwitchCommentManager)
