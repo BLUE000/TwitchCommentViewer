@@ -32,6 +32,9 @@ private slots:
     void on_btnSaveBouyomi_clicked();
     void on_btnTestBouyomi_clicked();
 
+public slots:
+    void appendAnalysisLog(const QString& logMsg);
+
 private:
     Ui::MainWindow *ui;
     QStandardItemModel* m_chatModel;

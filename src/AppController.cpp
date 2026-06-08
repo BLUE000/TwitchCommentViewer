@@ -1,6 +1,7 @@
 #include "AppController.h"
 #include "modules/TwitchEventCollectorImpl.h"
 #include "modules/BouyomiIntegrationImpl.h"
+#include "modules/CommentAnalyzer.h"
 #include "events/TwitchEvents.h"
 #include "MainWindow.h"
 #include <QDebug>
@@ -12,6 +13,13 @@ AppController::AppController(QObject* parent) : QObject(parent) {
     m_twitchCollector = std::make_unique<TwitchEventCollectorImpl>(this);
     m_dbManager = std::make_unique<DatabaseManager>();
     m_bouyomiIntegration = std::make_unique<BouyomiIntegrationImpl>(m_configManager.get(), this);
+    
+    // コメントアナライザーの初期化とシグナル接続
+    auto analyzer = std::make_unique<CommentAnalyzer>(this);
+    connect(analyzer.get(), &CommentAnalyzer::spamDetected, this, &AppController::emitSpamDetected);
+    connect(analyzer.get(), &CommentAnalyzer::trendWordDetected, this, &AppController::emitTrendWordDetected);
+    connect(analyzer.get(), &CommentAnalyzer::emotionScored, this, &AppController::emitEmotionScored);
+    m_commentAnalyzer = std::move(analyzer);
 }
 
 AppController::~AppController() {
@@ -82,7 +90,11 @@ void AppController::customEvent(QEvent* event) {
                 << "\n User:" << commentEvent->userName() 
                 << "\n Msg:" << commentEvent->message();
 
-        // TODO: CommentAnalyzer によるスパム判定と感情分析
+        // 解析実行
+        if (m_commentAnalyzer) {
+            m_commentAnalyzer->analyzeComment(commentEvent->userId(), commentEvent->userName(), commentEvent->message());
+        }
+
         bool isSpam = false;
         double sentiment = 0.0;
 
@@ -107,5 +119,27 @@ void AppController::customEvent(QEvent* event) {
         }
     } else {
         QObject::customEvent(event);
+    }
+}
+
+void AppController::emitSpamDetected(const QString& username, const QString& reason, const QString& message) {
+    if (m_mainWindow) {
+        QMetaObject::invokeMethod(m_mainWindow, "appendAnalysisLog", Qt::QueuedConnection,
+                                  Q_ARG(QString, QString("[Spam] %1: %2 (%3)").arg(username, reason, message)));
+    }
+}
+
+void AppController::emitTrendWordDetected(const QString& word, int count) {
+    if (m_mainWindow) {
+        QMetaObject::invokeMethod(m_mainWindow, "appendAnalysisLog", Qt::QueuedConnection,
+                                  Q_ARG(QString, QString("[Trend] '%1' is trending! (Count: %2)").arg(word).arg(count)));
+    }
+}
+
+void AppController::emitEmotionScored(const QString& username, const QString& message, double score) {
+    if (m_mainWindow) {
+        QString emotion = score > 0 ? "Positive" : "Negative";
+        QMetaObject::invokeMethod(m_mainWindow, "appendAnalysisLog", Qt::QueuedConnection,
+                                  Q_ARG(QString, QString("[%1: %2] %3: %4").arg(emotion).arg(score, 0, 'f', 2).arg(username, message)));
     }
 }

@@ -11,6 +11,8 @@ set(SOURCES
     modules/DatabaseManager.h
     modules/TwitchEventCollectorImpl.cpp
     modules/TwitchEventCollectorImpl.h
+    modules/CommentAnalyzer.cpp
+    modules/CommentAnalyzer.h
     events/TwitchEvents.h
     AppController.cpp
     AppController.h

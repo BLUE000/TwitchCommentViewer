@@ -87,3 +87,7 @@ void MainWindow::on_btnTestBouyomi_clicked() {
     }
     emit bouyomiTestRequested(testMessage);
 }
+
+void MainWindow::appendAnalysisLog(const QString& logMsg) {
+    ui->textBrowserAnalysis->append(logMsg);
+}
