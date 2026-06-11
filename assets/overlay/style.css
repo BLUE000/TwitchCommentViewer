@@ -27,10 +27,26 @@ body {
 .username {
     font-weight: bold;
     color: #ffb100; /* Twitchっぽい色や見やすい色に */
+    vertical-align: middle;
+}
+
+.avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+.badges {
+    margin-left: 4px;
+    margin-right: 4px;
+    vertical-align: middle;
 }
 
 .message {
     color: #ffffff;
+    vertical-align: middle;
 }
 
 /* アニメーション */

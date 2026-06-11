@@ -21,37 +21,66 @@
             console.log('Connected to OBS WebSocket Server');
         };
 
+        const badgeEmojis = {
+            broadcaster: '👑',
+            moderator: '🛡️',
+            vip: '💎',
+            subscriber: '⭐',
+            artist: '🎨'
+        };
+
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
             
             if (data.action === 'comment') {
-                addComment(data.username, data.message);
+                addComment(data.username, data.message, data.avatarUrl, data.badges);
             }
         };
 
-        function addComment(username, message) {
+        function addComment(username, message, avatarUrl, badges) {
             const container = document.getElementById('comment-container');
             
             // コメント要素の作成
             const commentDiv = document.createElement('div');
             commentDiv.className = 'comment slide-in';
             
+            // アバター画像
+            if (avatarUrl) {
+                const avatarImg = document.createElement('img');
+                avatarImg.className = 'avatar';
+                avatarImg.src = avatarUrl;
+                commentDiv.appendChild(avatarImg);
+            }
+            
             // ユーザー名
             const nameSpan = document.createElement('span');
             nameSpan.className = 'username';
             nameSpan.textContent = username;
+            commentDiv.appendChild(nameSpan);
+            
+            // バッジ
+            if (badges && badges.length > 0) {
+                const badgesSpan = document.createElement('span');
+                badgesSpan.className = 'badges';
+                badges.forEach(b => {
+                    const emoji = badgeEmojis[b];
+                    if (emoji) {
+                        badgesSpan.textContent += emoji;
+                    }
+                });
+                if (badgesSpan.textContent) {
+                    commentDiv.appendChild(badgesSpan);
+                }
+            }
             
             // 区切り
             const separator = document.createTextNode(': ');
+            commentDiv.appendChild(separator);
             
             // メッセージ内容
             const msgSpan = document.createElement('span');
             msgSpan.className = 'message';
             msgSpan.textContent = message;
-            
-            // 組み立て
-            commentDiv.appendChild(nameSpan);
-            commentDiv.appendChild(separator);
             commentDiv.appendChild(msgSpan);
             
             // コンテナに追加

@@ -69,6 +69,7 @@ private:
     // アバター取得用
     std::unique_ptr<QNetworkAccessManager> m_nam;
     QHash<QString, QIcon> m_avatarCache;
+    QHash<QString, QString> m_avatarUrlCache;
     QSet<QString> m_pendingAvatars;
 
     void fetchAvatar(const QString& userId);

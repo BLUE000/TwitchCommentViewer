@@ -205,6 +205,12 @@ void AppController::customEvent(QEvent* event) {
             obsPayload["username"] = commentEvent->userName();
             obsPayload["message"] = safeMessage;
             
+            QString userId = commentEvent->userId();
+            if (m_avatarUrlCache.contains(userId)) {
+                obsPayload["avatarUrl"] = m_avatarUrlCache[userId];
+            }
+            obsPayload["badges"] = commentEvent->badges();
+            
             if (m_configManager->getObsFileOutputEnabled() && m_obsFileIntegration) {
                 m_obsFileIntegration->sendAction("comment", obsPayload);
             }
@@ -406,6 +412,7 @@ void AppController::fetchAvatar(const QString& userId) {
                 if (!data.isEmpty()) {
                     QString imgUrl = data.first().toObject()["profile_image_url"].toString();
                     if (!imgUrl.isEmpty()) {
+                        m_avatarUrlCache[userId] = imgUrl;
                         downloadAvatarImage(userId, imgUrl);
                         reply->deleteLater();
                         return; // successfully went to download
