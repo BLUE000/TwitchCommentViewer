@@ -26,24 +26,28 @@ inline QEvent::Type chattersReceivedType() {
 
 class CommentEvent : public QEvent {
 public:
-    CommentEvent(const QString& userId, const QString& userName, const QString& message, const QStringList& badges = QStringList())
+    CommentEvent(const QString& userId, const QString& userName, const QString& message,
+                 const QStringList& badges = QStringList(), const QStringList& badgeUrls = QStringList())
         : QEvent(commentReceivedType())
         , m_userId(userId)
         , m_userName(userName)
         , m_message(message)
         , m_badges(badges)
+        , m_badgeUrls(badgeUrls)
     {}
 
     QString userId() const { return m_userId; }
     QString userName() const { return m_userName; }
     QString message() const { return m_message; }
     QStringList badges() const { return m_badges; }
+    QStringList badgeUrls() const { return m_badgeUrls; }
 
 private:
     QString m_userId;
     QString m_userName;
     QString m_message;
     QStringList m_badges;
+    QStringList m_badgeUrls;
 };
 
 class ChattersEvent : public QEvent {

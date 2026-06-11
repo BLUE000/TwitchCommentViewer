@@ -87,20 +87,37 @@ void TwitchEventCollectorImpl::processNotification(const QJsonObject& json) {
         QString text = messageObj["text"].toString();
 
         QStringList badges;
+        QStringList badgeUrls;
         QJsonArray badgesArr = eventObj["badges"].toArray();
         for (const QJsonValue& val : badgesArr) {
             QJsonObject badgeObj = val.toObject();
             QString setId = badgeObj["set_id"].toString();
+            QString verId = badgeObj["version"].toString();
+            if (verId.isEmpty()) {
+                verId = badgeObj["id"].toString();
+            }
             if (!setId.isEmpty()) {
                 badges.append(setId);
+                QString key = setId + ":" + verId;
+                if (m_badgeUrls.contains(key)) {
+                    badgeUrls.append(m_badgeUrls[key]);
+                } else {
+                    // fallback to version "1" if exact version not found
+                    QString fallbackKey = setId + ":1";
+                    if (m_badgeUrls.contains(fallbackKey)) {
+                        badgeUrls.append(m_badgeUrls[fallbackKey]);
+                    } else {
+                        badgeUrls.append(setId); // Fallback to raw set_id
+                    }
+                }
             }
         }
 
         // 【要件定義対応】: シグナルを使わず、Event割り込み(postEvent)でターゲットに非同期送信
         if (m_eventTarget) {
-            auto* evt = new TwitchEvents::CommentEvent(userId, userName, text, badges);
+            auto* evt = new TwitchEvents::CommentEvent(userId, userName, text, badges, badgeUrls);
             QCoreApplication::postEvent(m_eventTarget, evt);
-            qDebug() << "Dispatched CommentEvent for user:" << userName << "with badges:" << badges;
+            qDebug() << "Dispatched CommentEvent for user:" << userName << "with badges:" << badges << "and URLs:" << badgeUrls;
         }
     }
 }
@@ -123,6 +140,7 @@ void TwitchEventCollectorImpl::fetchBroadcasterIdAndSubscribe() {
             if (!dataObj.isEmpty()) {
                 m_broadcasterId = dataObj[0].toObject()["id"].toString();
                 qInfo() << "Fetched Broadcaster ID:" << m_broadcasterId;
+                fetchBadges();
                 registerSubscription();
             } else {
                 qWarning() << "No user data found.";
@@ -369,4 +387,61 @@ void TwitchEventCollectorImpl::unbanUser(const QString& targetUserId) {
         reply->deleteLater();
         nam->deleteLater();
     });
+}
+
+void TwitchEventCollectorImpl::fetchBadges() {
+    if (m_clientId.isEmpty() || m_accessToken.isEmpty() || m_broadcasterId.isEmpty()) return;
+
+    auto* nam = new QNetworkAccessManager(this);
+    
+    // 1. Fetch Global Badges
+    QNetworkRequest reqGlobal(QUrl("https://api.twitch.tv/helix/chat/badges/global"));
+    reqGlobal.setRawHeader("Authorization", ("Bearer " + m_accessToken).toUtf8());
+    reqGlobal.setRawHeader("Client-Id", m_clientId.toUtf8());
+
+    QNetworkReply* replyGlobal = nam->get(reqGlobal);
+    connect(replyGlobal, &QNetworkReply::finished, this, [this, replyGlobal, nam]() {
+        if (replyGlobal->error() == QNetworkReply::NoError) {
+            QJsonDocument doc = QJsonDocument::fromJson(replyGlobal->readAll());
+            parseAndCacheBadges(doc);
+        } else {
+            qWarning() << "Failed to fetch global badges:" << replyGlobal->errorString();
+        }
+        replyGlobal->deleteLater();
+        
+        // 2. Fetch Channel Badges
+        QNetworkRequest reqChannel(QUrl("https://api.twitch.tv/helix/chat/badges?broadcaster_id=" + m_broadcasterId));
+        reqChannel.setRawHeader("Authorization", ("Bearer " + m_accessToken).toUtf8());
+        reqChannel.setRawHeader("Client-Id", m_clientId.toUtf8());
+
+        QNetworkReply* replyChannel = nam->get(reqChannel);
+        connect(replyChannel, &QNetworkReply::finished, this, [this, replyChannel, nam]() {
+            if (replyChannel->error() == QNetworkReply::NoError) {
+                QJsonDocument doc = QJsonDocument::fromJson(replyChannel->readAll());
+                parseAndCacheBadges(doc); // Channel badges will overwrite global ones if duplicate
+            } else {
+                qWarning() << "Failed to fetch channel badges:" << replyChannel->errorString();
+            }
+            replyChannel->deleteLater();
+            nam->deleteLater(); // Delete the network manager after both requests
+        });
+    });
+}
+
+void TwitchEventCollectorImpl::parseAndCacheBadges(const QJsonDocument& doc) {
+    if (doc.isNull() || !doc.isObject()) return;
+    QJsonArray data = doc.object()["data"].toArray();
+    for (const QJsonValue& val : data) {
+        QJsonObject setObj = val.toObject();
+        QString setId = setObj["set_id"].toString();
+        QJsonArray versions = setObj["versions"].toArray();
+        for (const QJsonValue& verVal : versions) {
+            QJsonObject verObj = verVal.toObject();
+            QString verId = verObj["id"].toString();
+            QString imageUrl = verObj["image_url_1x"].toString();
+            if (!setId.isEmpty() && !verId.isEmpty() && !imageUrl.isEmpty()) {
+                m_badgeUrls[setId + ":" + verId] = imageUrl;
+            }
+        }
+    }
 }

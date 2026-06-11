@@ -5,6 +5,8 @@
 #include <QJsonObject>
 #include <QJsonDocument>
 
+#include <QHash>
+
 class TwitchEventCollectorImpl : public QObject, public ITwitchEventCollector {
     Q_OBJECT
 public:
@@ -37,7 +39,11 @@ private:
     QString m_sessionId;
     QString m_broadcasterId; // TwitchのユーザーID
 
+    QHash<QString, QString> m_badgeUrls; // set_id:version -> image_url
+
     void processNotification(const QJsonObject& json);
     void fetchBroadcasterIdAndSubscribe();
     void registerSubscription();
+    void fetchBadges();
+    void parseAndCacheBadges(const QJsonDocument& doc);
 };

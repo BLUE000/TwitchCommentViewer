@@ -62,13 +62,20 @@
             if (badges && badges.length > 0) {
                 const badgesSpan = document.createElement('span');
                 badgesSpan.className = 'badges';
-                badges.forEach(b => {
-                    const emoji = badgeEmojis[b];
-                    if (emoji) {
-                        badgesSpan.textContent += emoji;
+                badges.forEach(item => {
+                    if (item.startsWith('http')) {
+                        const badgeImg = document.createElement('img');
+                        badgeImg.className = 'badge-icon';
+                        badgeImg.src = item;
+                        badgesSpan.appendChild(badgeImg);
+                    } else {
+                        const emoji = badgeEmojis[item];
+                        if (emoji) {
+                            badgesSpan.textContent += emoji;
+                        }
                     }
                 });
-                if (badgesSpan.textContent) {
+                if (badgesSpan.children.length > 0 || badgesSpan.textContent) {
                     commentDiv.appendChild(badgesSpan);
                 }
             }

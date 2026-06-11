@@ -209,7 +209,7 @@ void AppController::customEvent(QEvent* event) {
             if (m_avatarUrlCache.contains(userId)) {
                 obsPayload["avatarUrl"] = m_avatarUrlCache[userId];
             }
-            obsPayload["badges"] = commentEvent->badges();
+            obsPayload["badges"] = commentEvent->badgeUrls();
             
             if (m_configManager->getObsFileOutputEnabled() && m_obsFileIntegration) {
                 m_obsFileIntegration->sendAction("comment", obsPayload);
