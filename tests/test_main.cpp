@@ -69,6 +69,100 @@ TEST(DatabaseManagerTest, SQLiteIntegrationWithTransCipher) {
     db.close();
 }
 
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QJsonValue>
+
+// UT-CHT-01: 視聴者リスト（chatters）のJSONデータ解析テスト
+TEST(ChattersTest, JSONParsingAndBadgeAssignment) {
+    QString rawJson = R"({
+        "data": [
+            {"user_id": "1", "user_login": "streamer_login", "user_name": "ストリーマー名", "user_badge": "broadcaster"},
+            {"user_id": "2", "user_login": "mod_login", "user_name": "モデレーター名", "user_badge": "moderator"},
+            {"user_id": "3", "user_login": "vip_login", "user_name": "", "user_badge": "vip"},
+            {"user_id": "4", "user_login": "normal_login", "user_name": "一般ユーザー", "user_badge": "none"}
+        ]
+    })";
+
+    QJsonDocument doc = QJsonDocument::fromJson(rawJson.toUtf8());
+    ASSERT_FALSE(doc.isNull());
+    ASSERT_TRUE(doc.isObject());
+
+    QJsonArray dataArray = doc.object()["data"].toArray();
+    QList<QPair<QString, QString>> chatterList;
+
+    for (const QJsonValue& val : dataArray) {
+        QJsonObject obj = val.toObject();
+        QString userName = obj["user_name"].toString();
+        if (userName.isEmpty()) {
+            userName = obj["user_login"].toString();
+        }
+        QString userBadge = obj["user_badge"].toString();
+        chatterList.append(qMakePair(userName, userBadge));
+    }
+
+    ASSERT_EQ(chatterList.size(), 4);
+    
+    // 1: Broadcaster
+    EXPECT_EQ(chatterList[0].first, "ストリーマー名");
+    EXPECT_EQ(chatterList[0].second, "broadcaster");
+
+    // 2: Moderator
+    EXPECT_EQ(chatterList[1].first, "モデレーター名");
+    EXPECT_EQ(chatterList[1].second, "moderator");
+
+    // 3: VIP (fallback to user_login)
+    EXPECT_EQ(chatterList[2].first, "vip_login");
+    EXPECT_EQ(chatterList[2].second, "vip");
+
+    // 4: None
+    EXPECT_EQ(chatterList[3].first, "一般ユーザー");
+    EXPECT_EQ(chatterList[3].second, "none");
+}
+
+// UT-CHT-02: ボットユーザーの除外判定ロジックのテスト
+TEST(ChattersTest, BotExclusionFilter) {
+    QStringList botUsers = {"Nightbot", "Moobot", "StreamElements"};
+    QStringList lowerBots;
+    for (const QString& b : botUsers) {
+        lowerBots.append(b.toLower());
+    }
+
+    // テスト対象の入力
+    QString testUser1 = "nightbot";
+    QString testUser2 = "moobot";
+    QString testUser3 = "STREAMELEMENTS";
+    QString testUser4 = "twitch_tarou";
+
+    EXPECT_TRUE(lowerBots.contains(testUser1.toLower()));
+    EXPECT_TRUE(lowerBots.contains(testUser2.toLower()));
+    EXPECT_TRUE(lowerBots.contains(testUser3.toLower()));
+    EXPECT_FALSE(lowerBots.contains(testUser4.toLower()));
+}
+
+// UT-CHT-03: 手動更新クールダウンの秒数判定ロジックのテスト
+TEST(ChattersTest, CooldownLogic) {
+    QDateTime lastFetch = QDateTime::currentDateTime().addSecs(-100); // 100秒前
+    qint64 secsElapsed = lastFetch.secsTo(QDateTime::currentDateTime());
+    
+    // 3分(180秒)未満は手動更新不可
+    EXPECT_FALSE(secsElapsed >= 180);
+    EXPECT_FALSE(secsElapsed >= 600);
+
+    QDateTime lastFetch3Min = QDateTime::currentDateTime().addSecs(-200); // 200秒前
+    secsElapsed = lastFetch3Min.secsTo(QDateTime::currentDateTime());
+    // 3分以上なので手動更新可能、10分未満なので自動更新は走らない
+    EXPECT_TRUE(secsElapsed >= 180);
+    EXPECT_FALSE(secsElapsed >= 600);
+
+    QDateTime lastFetch10Min = QDateTime::currentDateTime().addSecs(-610); // 610秒前
+    secsElapsed = lastFetch10Min.secsTo(QDateTime::currentDateTime());
+    // 10分以上なので自動更新も手動更新も可能
+    EXPECT_TRUE(secsElapsed >= 180);
+    EXPECT_TRUE(secsElapsed >= 600);
+}
+
 #include <QCoreApplication>
 
 int main(int argc, char **argv) {

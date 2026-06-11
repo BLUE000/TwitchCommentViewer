@@ -20,6 +20,8 @@
 #include <QMessageBox>
 #include <QHBoxLayout>
 #include <QPushButton>
+#include <QScrollArea>
+#include <QVBoxLayout>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -27,6 +29,17 @@ MainWindow::MainWindow(QWidget *parent)
     , m_chatModel(new QStandardItemModel(0, 2, this))
 {
     ui->setupUi(this);
+
+    // ビューワタブの名称をコメントに変更
+    ui->tabWidget->setTabText(0, "コメント");
+
+    // 視聴者タブの追加
+    m_tabChatters = new QWidget(this);
+    ui->tabWidget->insertTab(1, m_tabChatters, "視聴者");
+    setupChattersTab();
+
+    // タブ変更シグナルの接続
+    connect(ui->tabWidget, &QTabWidget::currentChanged, this, &MainWindow::tabChanged);
 
     // QTabWidgetの右上にボタンを追加
     QWidget* cornerWidget = new QWidget(this);
@@ -482,4 +495,123 @@ void MainWindow::updateChartDisplay() {
     m_axisY->setRange(0, maxCount + 1);
     m_axisY->setTickCount(qMin(10LL, maxCount + 2));
     qDebug() << "updateChartDisplay finish";
+}
+
+void MainWindow::setupChattersTab() {
+    auto* mainLayout = new QVBoxLayout(m_tabChatters);
+
+    // 上部コントロール
+    auto* topLayout = new QHBoxLayout();
+    m_btnUpdateChatters = new QPushButton("更新", m_tabChatters);
+    m_btnUpdateChatters->setEnabled(false); // 初期状態は無効
+    m_labelLastUpdate = new QLabel("最終更新: 未取得", m_tabChatters);
+    
+    topLayout->addWidget(m_btnUpdateChatters);
+    topLayout->addWidget(m_labelLastUpdate);
+    topLayout->addStretch();
+    mainLayout->addLayout(topLayout);
+
+    // スクロールエリア
+    auto* scrollArea = new QScrollArea(m_tabChatters);
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setFrameShape(QFrame::NoFrame);
+    
+    auto* scrollWidget = new QWidget(scrollArea);
+    auto* scrollLayout = new QVBoxLayout(scrollWidget);
+    scrollLayout->setContentsMargins(5, 5, 5, 5);
+    scrollLayout->setSpacing(5);
+
+    // アコーディオン作成マクロ的にヘルパーラムダを使用
+    auto createAccordion = [this, scrollWidget, scrollLayout](QPushButton*& btn, QListWidget*& list, const QString& title) {
+        btn = new QPushButton("▶ " + title + " (0)", scrollWidget);
+        btn->setStyleSheet("text-align: left; font-weight: bold; padding: 5px;");
+        list = new QListWidget(scrollWidget);
+        list->setVisible(false); // 初期状態は折りたたみ
+        list->setSelectionMode(QAbstractItemView::NoSelection);
+        
+        scrollLayout->addWidget(btn);
+        scrollLayout->addWidget(list);
+        
+        connect(btn, &QPushButton::clicked, this, [btn, list, title]() {
+            bool visible = !list->isVisible();
+            list->setVisible(visible);
+            btn->setText(QString("%1 %2 (%3)")
+                .arg(visible ? "▼" : "▶")
+                .arg(title)
+                .arg(list->count()));
+        });
+    };
+
+    createAccordion(m_btnToggleAll, m_listAll, "すべて");
+    createAccordion(m_btnToggleBroadcaster, m_listBroadcaster, "ストリーマー");
+    createAccordion(m_btnToggleModerator, m_listModerator, "モデレーター");
+    createAccordion(m_btnToggleVip, m_listVip, "VIP");
+    createAccordion(m_btnToggleBot, m_listBot, "チャットボット");
+    createAccordion(m_btnToggleRegular, m_listRegular, "一般");
+
+    scrollLayout->addStretch();
+    scrollArea->setWidget(scrollWidget);
+    mainLayout->addWidget(scrollArea);
+
+    // 更新ボタンのシグナル接続
+    connect(m_btnUpdateChatters, &QPushButton::clicked, this, &MainWindow::chatterRefreshRequested);
+}
+
+void MainWindow::setUpdateButtonEnabled(bool enabled) {
+    if (m_btnUpdateChatters) {
+        m_btnUpdateChatters->setEnabled(enabled);
+    }
+}
+
+void MainWindow::updateChattersList(const QList<QPair<QString, QString>>& chatters) {
+    if (!m_listAll) return;
+
+    m_listAll->clear();
+    m_listBroadcaster->clear();
+    m_listModerator->clear();
+    m_listVip->clear();
+    m_listBot->clear();
+    m_listRegular->clear();
+
+    QStringList botUsers = m_configManager ? m_configManager->getBotUsers() : QStringList();
+    QStringList lowerBots;
+    for (const QString& b : botUsers) {
+        lowerBots.append(b.toLower());
+    }
+
+    for (const auto& pair : chatters) {
+        QString name = pair.first;
+        QString role = pair.second;
+
+        m_listAll->addItem(name);
+
+        if (lowerBots.contains(name.toLower())) {
+            m_listBot->addItem(name);
+        } else if (role == "broadcaster") {
+            m_listBroadcaster->addItem(name);
+        } else if (role == "moderator") {
+            m_listModerator->addItem(name);
+        } else if (role == "vip") {
+            m_listVip->addItem(name);
+        } else {
+            m_listRegular->addItem(name);
+        }
+    }
+
+    // 各アコーディオンボタンのテキスト更新
+    auto updateBtnText = [](QPushButton* btn, QListWidget* list, const QString& title) {
+        btn->setText(QString("%1 %2 (%3)")
+            .arg(list->isVisible() ? "▼" : "▶")
+            .arg(title)
+            .arg(list->count()));
+    };
+
+    updateBtnText(m_btnToggleAll, m_listAll, "すべて");
+    updateBtnText(m_btnToggleBroadcaster, m_listBroadcaster, "ストリーマー");
+    updateBtnText(m_btnToggleModerator, m_listModerator, "モデレーター");
+    updateBtnText(m_btnToggleVip, m_listVip, "VIP");
+    updateBtnText(m_btnToggleBot, m_listBot, "チャットボット");
+    updateBtnText(m_btnToggleRegular, m_listRegular, "一般");
+
+    m_labelLastUpdate->setText("最終更新: " + QDateTime::currentDateTime().toString("HH:mm:ss"));
 }

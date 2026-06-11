@@ -1,12 +1,19 @@
 #pragma once
 #include <QEvent>
 #include <QString>
+#include <QList>
+#include <QPair>
 
 namespace TwitchEvents {
 
 // 独自のQEvent::Typeを登録 (1000以降を安全に利用するため registerEventType を使用)
 // inlineだと翻訳単位ごとに異なるIDが振られる事故を防ぐため関数でくるむ
 inline QEvent::Type commentReceivedType() {
+    static QEvent::Type type = static_cast<QEvent::Type>(QEvent::registerEventType());
+    return type;
+}
+
+inline QEvent::Type chattersReceivedType() {
     static QEvent::Type type = static_cast<QEvent::Type>(QEvent::registerEventType());
     return type;
 }
@@ -28,6 +35,19 @@ private:
     QString m_userId;
     QString m_userName;
     QString m_message;
+};
+
+class ChattersEvent : public QEvent {
+public:
+    explicit ChattersEvent(const QList<QPair<QString, QString>>& chatters)
+        : QEvent(chattersReceivedType())
+        , m_chatters(chatters)
+    {}
+
+    QList<QPair<QString, QString>> chatters() const { return m_chatters; }
+
+private:
+    QList<QPair<QString, QString>> m_chatters;
 };
 
 } // namespace TwitchEvents

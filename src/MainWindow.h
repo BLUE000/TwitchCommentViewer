@@ -11,6 +11,9 @@
 #include <QtCharts/QLineSeries>
 #include <QtCharts/QDateTimeAxis>
 #include <QtCharts/QValueAxis>
+#include <QListWidget>
+#include <QLabel>
+#include <QPushButton>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -38,6 +41,8 @@ signals:
     void authRequested();
     void bouyomiTestRequested(const QString& message);
     void botSettingsChanged(const QStringList& bots);
+    void tabChanged(int index);
+    void chatterRefreshRequested();
 
 private slots:
     void on_btnStartAuth_clicked();
@@ -61,6 +66,8 @@ private slots:
 public slots:
     void appendAnalysisLog(const QString& logMsg);
     void updateStatistics(int totalComments, const QMap<QString, int>& userCounts, const QString& latestUser = "", const QDateTime& latestTime = QDateTime());
+    void updateChattersList(const QList<QPair<QString, QString>>& chatters);
+    void setUpdateButtonEnabled(bool enabled);
 
 private slots:
     void onChartConfigChanged();
@@ -89,5 +96,24 @@ private:
     };
     QList<LogEntry> m_commentHistory;
     bool m_chartNeedsUpdate = false;
+
+    // 視聴者リスト用UI構築およびメンバ
+    void setupChattersTab();
+    QWidget* m_tabChatters = nullptr;
+    QPushButton* m_btnUpdateChatters = nullptr;
+    QLabel* m_labelLastUpdate = nullptr;
+
+    QPushButton* m_btnToggleAll = nullptr;
+    QListWidget* m_listAll = nullptr;
+    QPushButton* m_btnToggleBroadcaster = nullptr;
+    QListWidget* m_listBroadcaster = nullptr;
+    QPushButton* m_btnToggleModerator = nullptr;
+    QListWidget* m_listModerator = nullptr;
+    QPushButton* m_btnToggleVip = nullptr;
+    QListWidget* m_listVip = nullptr;
+    QPushButton* m_btnToggleBot = nullptr;
+    QListWidget* m_listBot = nullptr;
+    QPushButton* m_btnToggleRegular = nullptr;
+    QListWidget* m_listRegular = nullptr;
 };
 #endif // MAINWINDOW_H

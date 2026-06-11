@@ -99,6 +99,8 @@ void AppController::initialize() {
                 }
             });
             connect(m_mainWindow, &MainWindow::botSettingsChanged, this, &AppController::updateBotUsers);
+            connect(m_mainWindow, &MainWindow::tabChanged, this, &AppController::onTabWidgetChanged);
+            connect(m_mainWindow, &MainWindow::chatterRefreshRequested, this, &AppController::triggerChattersFetch);
             
             // MainWindowへDB参照を渡し、履歴をロード
             m_mainWindow->setDatabaseManager(m_dbManager.get());
@@ -167,6 +169,18 @@ void AppController::customEvent(QEvent* event) {
                 m_mainWindow->addCommentToView(name, msg);
             }, Qt::QueuedConnection);
         }
+    } else if (event->type() == TwitchEvents::chattersReceivedType()) {
+        auto* chattersEvent = static_cast<TwitchEvents::ChattersEvent*>(event);
+        m_lastChattersFetchTime = QDateTime::currentDateTime();
+        
+        // タイマーコールバックを即時呼んでボタンの無効化（クールダウン開始）を反映
+        onChattersTimerTimeout();
+        
+        if (m_mainWindow) {
+            QMetaObject::invokeMethod(m_mainWindow, [this, list = chattersEvent->chatters()]() {
+                if (m_mainWindow) m_mainWindow->updateChattersList(list);
+            }, Qt::QueuedConnection);
+        }
     } else {
         QObject::customEvent(event);
     }
@@ -208,5 +222,64 @@ void AppController::emitStatisticsUpdated(int totalComments, const QMap<QString,
         QMetaObject::invokeMethod(m_mainWindow, [this, totalComments, userCounts, latestUser, latestTime]() {
             if (m_mainWindow) m_mainWindow->updateStatistics(totalComments, userCounts, latestUser, latestTime);
         }, Qt::QueuedConnection);
+    }
+}
+
+void AppController::onTabWidgetChanged(int index) {
+    // インデックス 1 が「視聴者」タブ
+    if (index == 1) {
+        m_chattersTabActive = true;
+        qInfo() << "Viewer tab activated.";
+
+        // 初回表示時、または10分（600秒）以上経過していれば取得
+        if (m_lastChattersFetchTime.isNull() || 
+            m_lastChattersFetchTime.secsTo(QDateTime::currentDateTime()) >= 600) {
+            triggerChattersFetch();
+        }
+
+        if (m_chattersTimer == nullptr) {
+            m_chattersTimer = new QTimer(this);
+            m_chattersTimer->setInterval(1000); // 1秒ごとにチェック
+            connect(m_chattersTimer, &QTimer::timeout, this, &AppController::onChattersTimerTimeout);
+        }
+        m_chattersTimer->start();
+        onChattersTimerTimeout(); // ボタンの初期状態反映
+    } else {
+        if (m_chattersTabActive) {
+            m_chattersTabActive = false;
+            qInfo() << "Viewer tab deactivated. Stopping polling timer.";
+            if (m_chattersTimer) {
+                m_chattersTimer->stop();
+            }
+        }
+    }
+}
+
+void AppController::onChattersTimerTimeout() {
+    if (!m_chattersTabActive || !m_mainWindow) return;
+
+    if (m_lastChattersFetchTime.isNull()) {
+        m_mainWindow->setUpdateButtonEnabled(true);
+    } else {
+        qint64 secs = m_lastChattersFetchTime.secsTo(QDateTime::currentDateTime());
+        
+        // 3分（180秒）経過していれば手動更新可能
+        m_mainWindow->setUpdateButtonEnabled(secs >= 180);
+
+        // 10分（600秒）経過していれば自動再取得
+        if (secs >= 600) {
+            qInfo() << "10 minutes passed since last fetch. Auto refetching chatters...";
+            triggerChattersFetch();
+        }
+    }
+}
+
+void AppController::triggerChattersFetch() {
+    if (m_twitchCollector) {
+        // ボタンを先行して無効化（二重取得防止）
+        if (m_mainWindow) {
+            m_mainWindow->setUpdateButtonEnabled(false);
+        }
+        m_twitchCollector->requestChatters();
     }
 }

@@ -159,3 +159,47 @@ void TwitchEventCollectorImpl::registerSubscription() {
         nam->deleteLater();
     });
 }
+
+void TwitchEventCollectorImpl::requestChatters() {
+    if (m_clientId.isEmpty() || m_accessToken.isEmpty() || m_broadcasterId.isEmpty()) {
+        qWarning() << "Cannot fetch chatters: Missing Auth Data or Broadcaster ID.";
+        return;
+    }
+
+    auto* nam = new QNetworkAccessManager(this);
+    QUrl url(QString("https://api.twitch.tv/helix/chat/chatters?broadcaster_id=%1&moderator_id=%2&first=1000")
+             .arg(m_broadcasterId).arg(m_broadcasterId));
+    QNetworkRequest request(url);
+    request.setRawHeader("Authorization", ("Bearer " + m_accessToken).toUtf8());
+    request.setRawHeader("Client-Id", m_clientId.toUtf8());
+
+    qInfo() << "Requesting chatters list from Twitch Helix API...";
+    QNetworkReply* reply = nam->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, nam]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+            QJsonArray dataArray = doc.object()["data"].toArray();
+            QList<QPair<QString, QString>> chatterList;
+            
+            for (const QJsonValue& val : dataArray) {
+                QJsonObject obj = val.toObject();
+                QString userName = obj["user_name"].toString();
+                if (userName.isEmpty()) {
+                    userName = obj["user_login"].toString();
+                }
+                QString userBadge = obj["user_badge"].toString();
+                chatterList.append(qMakePair(userName, userBadge));
+            }
+            
+            qInfo() << "Successfully fetched" << chatterList.size() << "chatters!";
+            if (m_eventTarget) {
+                auto* evt = new TwitchEvents::ChattersEvent(chatterList);
+                QCoreApplication::postEvent(m_eventTarget, evt);
+            }
+        } else {
+            qWarning() << "Failed to fetch chatters:" << reply->errorString() << reply->readAll();
+        }
+        reply->deleteLater();
+        nam->deleteLater();
+    });
+}

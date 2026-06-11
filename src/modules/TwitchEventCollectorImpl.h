@@ -13,6 +13,7 @@ public:
 
     void connectToTwitch() override;
     void disconnectFromTwitch() override;
+    void requestChatters() override;
 
     // 認証情報をセットする
     void setAuthData(const QString& clientId, const QString& accessToken);

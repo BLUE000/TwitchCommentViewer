@@ -1,6 +1,8 @@
 #pragma once
 #include <QObject>
 #include <QEvent>
+#include <QDateTime>
+#include <QTimer>
 #include <memory>
 #include "interfaces/ITwitchEventCollector.h"
 #include "interfaces/IBouyomiIntegration.h"
@@ -38,6 +40,15 @@ private:
     std::unique_ptr<ObsHttpServer> m_obsHttpServer;
     std::unique_ptr<ICommentAnalyzer> m_commentAnalyzer;
     std::unique_ptr<DatabaseManager> m_dbManager;
+
+    // 視聴者リスト制御用メンバ
+    QDateTime m_lastChattersFetchTime;
+    QTimer* m_chattersTimer = nullptr;
+    bool m_chattersTabActive = false;
+
+    void onTabWidgetChanged(int index);
+    void onChattersTimerTimeout();
+    void triggerChattersFetch();
     
     // UI通知用の中継メソッド（解析タブ用）
     void emitSpamDetected(const QString& username, const QString& reason, const QString& message);
