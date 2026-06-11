@@ -82,9 +82,7 @@ void AppController::initialize() {
                 m_twitchCollector->connectToTwitch();
 
                 if (m_mainWindow) {
-                    QMessageBox::information(m_mainWindow, "認証成功",
-                        "Twitchとの連携認証に成功しました！\n"
-                        "アクセストークンを安全に暗号化して保存しました。自動接続を開始します。");
+                    m_mainWindow->showStatusMessage("Twitchとの連携認証に成功しました！自動接続を開始します。");
                 }
             } else {
                 qWarning() << "OAuth Authentication Failed:" << errorMsg;

@@ -74,6 +74,7 @@ public slots:
     void updateStatistics(int totalComments, const QMap<QString, int>& userCounts, const QString& latestUser = "", const QDateTime& latestTime = QDateTime());
     void updateChattersList(const QList<TwitchEvents::ChatterInfo>& chatters);
     void setUpdateButtonEnabled(bool enabled);
+    void showStatusMessage(const QString& message, int timeoutMs = 5000);
 
 private slots:
     void onChatterShoutoutClicked(const QString& userId, const QString& userName);

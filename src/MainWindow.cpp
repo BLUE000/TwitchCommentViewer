@@ -188,6 +188,12 @@ void MainWindow::appendAnalysisLog(const QString& logMsg) {
     ui->textBrowserAnalysis->append(logMsg);
 }
 
+void MainWindow::showStatusMessage(const QString& message, int timeoutMs) {
+    if (ui->statusbar) {
+        ui->statusbar->showMessage(message, timeoutMs);
+    }
+}
+
 void MainWindow::on_btnSaveObs_clicked() {
     if (m_configManager) {
         m_configManager->setObsFileOutputEnabled(ui->chkObsFileOutput->isChecked());
