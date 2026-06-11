@@ -74,6 +74,8 @@ TEST(DatabaseManagerTest, SQLiteIntegrationWithTransCipher) {
 #include <QJsonArray>
 #include <QJsonValue>
 
+#include "events/TwitchEvents.h"
+
 // UT-CHT-01: 視聴者リスト（chatters）のJSONデータ解析テスト
 TEST(ChattersTest, JSONParsingAndBadgeAssignment) {
     QString rawJson = R"({
@@ -90,35 +92,45 @@ TEST(ChattersTest, JSONParsingAndBadgeAssignment) {
     ASSERT_TRUE(doc.isObject());
 
     QJsonArray dataArray = doc.object()["data"].toArray();
-    QList<QPair<QString, QString>> chatterList;
+    QList<TwitchEvents::ChatterInfo> chatterList;
 
     for (const QJsonValue& val : dataArray) {
         QJsonObject obj = val.toObject();
+        QString userId = obj["user_id"].toString();
         QString userName = obj["user_name"].toString();
         if (userName.isEmpty()) {
             userName = obj["user_login"].toString();
         }
         QString userBadge = obj["user_badge"].toString();
-        chatterList.append(qMakePair(userName, userBadge));
+        
+        TwitchEvents::ChatterInfo info;
+        info.userId = userId;
+        info.userName = userName;
+        info.userBadge = userBadge;
+        chatterList.append(info);
     }
 
     ASSERT_EQ(chatterList.size(), 4);
     
     // 1: Broadcaster
-    EXPECT_EQ(chatterList[0].first, "ストリーマー名");
-    EXPECT_EQ(chatterList[0].second, "broadcaster");
+    EXPECT_EQ(chatterList[0].userId, "1");
+    EXPECT_EQ(chatterList[0].userName, "ストリーマー名");
+    EXPECT_EQ(chatterList[0].userBadge, "broadcaster");
 
     // 2: Moderator
-    EXPECT_EQ(chatterList[1].first, "モデレーター名");
-    EXPECT_EQ(chatterList[1].second, "moderator");
+    EXPECT_EQ(chatterList[1].userId, "2");
+    EXPECT_EQ(chatterList[1].userName, "モデレーター名");
+    EXPECT_EQ(chatterList[1].userBadge, "moderator");
 
     // 3: VIP (fallback to user_login)
-    EXPECT_EQ(chatterList[2].first, "vip_login");
-    EXPECT_EQ(chatterList[2].second, "vip");
+    EXPECT_EQ(chatterList[2].userId, "3");
+    EXPECT_EQ(chatterList[2].userName, "vip_login");
+    EXPECT_EQ(chatterList[2].userBadge, "vip");
 
     // 4: None
-    EXPECT_EQ(chatterList[3].first, "一般ユーザー");
-    EXPECT_EQ(chatterList[3].second, "none");
+    EXPECT_EQ(chatterList[3].userId, "4");
+    EXPECT_EQ(chatterList[3].userName, "一般ユーザー");
+    EXPECT_EQ(chatterList[3].userBadge, "none");
 }
 
 // UT-CHT-02: ボットユーザーの除外判定ロジックのテスト

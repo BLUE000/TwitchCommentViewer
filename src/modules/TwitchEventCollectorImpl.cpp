@@ -179,16 +179,22 @@ void TwitchEventCollectorImpl::requestChatters() {
         if (reply->error() == QNetworkReply::NoError) {
             QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
             QJsonArray dataArray = doc.object()["data"].toArray();
-            QList<QPair<QString, QString>> chatterList;
+            QList<TwitchEvents::ChatterInfo> chatterList;
             
             for (const QJsonValue& val : dataArray) {
                 QJsonObject obj = val.toObject();
+                QString userId = obj["user_id"].toString();
                 QString userName = obj["user_name"].toString();
                 if (userName.isEmpty()) {
                     userName = obj["user_login"].toString();
                 }
                 QString userBadge = obj["user_badge"].toString();
-                chatterList.append(qMakePair(userName, userBadge));
+                
+                TwitchEvents::ChatterInfo info;
+                info.userId = userId;
+                info.userName = userName;
+                info.userBadge = userBadge;
+                chatterList.append(info);
             }
             
             qInfo() << "Successfully fetched" << chatterList.size() << "chatters!";
@@ -198,6 +204,157 @@ void TwitchEventCollectorImpl::requestChatters() {
             }
         } else {
             qWarning() << "Failed to fetch chatters:" << reply->errorString() << reply->readAll();
+        }
+        reply->deleteLater();
+        nam->deleteLater();
+    });
+}
+
+void TwitchEventCollectorImpl::sendShoutout(const QString& toBroadcasterId) {
+    if (m_clientId.isEmpty() || m_accessToken.isEmpty() || m_broadcasterId.isEmpty()) {
+        qWarning() << "Cannot send shoutout: Missing Auth Data or Broadcaster ID.";
+        return;
+    }
+    auto* nam = new QNetworkAccessManager(this);
+    QUrl url(QString("https://api.twitch.tv/helix/chat/shoutouts?broadcaster_id=%1&moderator_id=%2&to_broadcaster_id=%3")
+             .arg(m_broadcasterId).arg(m_broadcasterId).arg(toBroadcasterId));
+    QNetworkRequest request(url);
+    request.setRawHeader("Authorization", ("Bearer " + m_accessToken).toUtf8());
+    request.setRawHeader("Client-Id", m_clientId.toUtf8());
+    
+    qInfo() << "Sending shoutout to broadcaster:" << toBroadcasterId;
+    QNetworkReply* reply = nam->post(request, QByteArray());
+    connect(reply, &QNetworkReply::finished, this, [reply, nam]() {
+        if (reply->error() != QNetworkReply::NoError) {
+            qWarning() << "Failed to send shoutout:" << reply->errorString() << reply->readAll();
+        } else {
+            qInfo() << "Shoutout sent successfully!";
+        }
+        reply->deleteLater();
+        nam->deleteLater();
+    });
+}
+
+void TwitchEventCollectorImpl::setVipStatus(const QString& targetUserId, bool enable) {
+    if (m_clientId.isEmpty() || m_accessToken.isEmpty() || m_broadcasterId.isEmpty()) {
+        qWarning() << "Cannot set VIP status: Missing Auth Data or Broadcaster ID.";
+        return;
+    }
+    auto* nam = new QNetworkAccessManager(this);
+    QUrl url(QString("https://api.twitch.tv/helix/channels/vips?broadcaster_id=%1&user_id=%2")
+             .arg(m_broadcasterId).arg(targetUserId));
+    QNetworkRequest request(url);
+    request.setRawHeader("Authorization", ("Bearer " + m_accessToken).toUtf8());
+    request.setRawHeader("Client-Id", m_clientId.toUtf8());
+    
+    QNetworkReply* reply = nullptr;
+    if (enable) {
+        qInfo() << "Adding VIP status for user:" << targetUserId;
+        reply = nam->post(request, QByteArray());
+    } else {
+        qInfo() << "Removing VIP status for user:" << targetUserId;
+        reply = nam->deleteResource(request);
+    }
+    
+    connect(reply, &QNetworkReply::finished, this, [reply, nam, enable]() {
+        if (reply->error() != QNetworkReply::NoError) {
+            qWarning() << "Failed to change VIP status (enable:" << enable << "):" << reply->errorString() << reply->readAll();
+        } else {
+            qInfo() << "VIP status updated successfully (enable:" << enable << ")!";
+        }
+        reply->deleteLater();
+        nam->deleteLater();
+    });
+}
+
+void TwitchEventCollectorImpl::setModeratorStatus(const QString& targetUserId, bool enable) {
+    if (m_clientId.isEmpty() || m_accessToken.isEmpty() || m_broadcasterId.isEmpty()) {
+        qWarning() << "Cannot set Moderator status: Missing Auth Data or Broadcaster ID.";
+        return;
+    }
+    auto* nam = new QNetworkAccessManager(this);
+    QUrl url(QString("https://api.twitch.tv/helix/moderation/moderators?broadcaster_id=%1&user_id=%2")
+             .arg(m_broadcasterId).arg(targetUserId));
+    QNetworkRequest request(url);
+    request.setRawHeader("Authorization", ("Bearer " + m_accessToken).toUtf8());
+    request.setRawHeader("Client-Id", m_clientId.toUtf8());
+    
+    QNetworkReply* reply = nullptr;
+    if (enable) {
+        qInfo() << "Adding Moderator status for user:" << targetUserId;
+        reply = nam->post(request, QByteArray());
+    } else {
+        qInfo() << "Removing Moderator status for user:" << targetUserId;
+        reply = nam->deleteResource(request);
+    }
+    
+    connect(reply, &QNetworkReply::finished, this, [reply, nam, enable]() {
+        if (reply->error() != QNetworkReply::NoError) {
+            qWarning() << "Failed to change Moderator status (enable:" << enable << "):" << reply->errorString() << reply->readAll();
+        } else {
+            qInfo() << "Moderator status updated successfully (enable:" << enable << ")!";
+        }
+        reply->deleteLater();
+        nam->deleteLater();
+    });
+}
+
+void TwitchEventCollectorImpl::banUser(const QString& targetUserId, int duration, const QString& reason) {
+    if (m_clientId.isEmpty() || m_accessToken.isEmpty() || m_broadcasterId.isEmpty()) {
+        qWarning() << "Cannot ban/timeout user: Missing Auth Data or Broadcaster ID.";
+        return;
+    }
+    auto* nam = new QNetworkAccessManager(this);
+    QUrl url(QString("https://api.twitch.tv/helix/moderation/bans?broadcaster_id=%1&moderator_id=%2")
+             .arg(m_broadcasterId).arg(m_broadcasterId));
+    QNetworkRequest request(url);
+    request.setRawHeader("Authorization", ("Bearer " + m_accessToken).toUtf8());
+    request.setRawHeader("Client-Id", m_clientId.toUtf8());
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    
+    QJsonObject dataObj;
+    dataObj["user_id"] = targetUserId;
+    if (duration > 0) {
+        dataObj["duration"] = duration;
+    }
+    dataObj["reason"] = reason;
+    
+    QJsonObject bodyObj;
+    bodyObj["data"] = dataObj;
+    QJsonDocument doc(bodyObj);
+    
+    qInfo() << "Banning/Timing-out user:" << targetUserId << "duration:" << duration;
+    QNetworkReply* reply = nam->post(request, doc.toJson());
+    connect(reply, &QNetworkReply::finished, this, [reply, nam]() {
+        if (reply->error() != QNetworkReply::NoError) {
+            qWarning() << "Failed to ban/timeout user:" << reply->errorString() << reply->readAll();
+        } else {
+            qInfo() << "User banned/timed-out successfully!";
+        }
+        reply->deleteLater();
+        nam->deleteLater();
+    });
+}
+
+void TwitchEventCollectorImpl::unbanUser(const QString& targetUserId) {
+    if (m_clientId.isEmpty() || m_accessToken.isEmpty() || m_broadcasterId.isEmpty()) {
+        qWarning() << "Cannot unban user: Missing Auth Data or Broadcaster ID.";
+        return;
+    }
+    auto* nam = new QNetworkAccessManager(this);
+    QUrl url(QString("https://api.twitch.tv/helix/moderation/bans?broadcaster_id=%1&moderator_id=%2&user_id=%3")
+             .arg(m_broadcasterId).arg(m_broadcasterId).arg(targetUserId));
+    QNetworkRequest request(url);
+    request.setRawHeader("Authorization", ("Bearer " + m_accessToken).toUtf8());
+    request.setRawHeader("Client-Id", m_clientId.toUtf8());
+    
+    qInfo() << "Unbanning user:" << targetUserId;
+    QNetworkReply* reply = nam->deleteResource(request);
+    connect(reply, &QNetworkReply::finished, this, [reply, nam]() {
+        if (reply->error() != QNetworkReply::NoError) {
+            qWarning() << "Failed to unban user:" << reply->errorString() << reply->readAll();
+        } else {
+            qInfo() << "User unbanned successfully!";
         }
         reply->deleteLater();
         nam->deleteLater();

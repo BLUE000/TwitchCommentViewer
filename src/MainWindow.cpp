@@ -22,6 +22,8 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QVBoxLayout>
+#include "modules/ChatterRowWidget.h"
+#include <QInputDialog>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -527,7 +529,7 @@ void MainWindow::setupChattersTab() {
         btn->setStyleSheet("text-align: left; font-weight: bold; padding: 5px;");
         list = new QListWidget(scrollWidget);
         list->setVisible(false); // 初期状態は折りたたみ
-        list->setSelectionMode(QAbstractItemView::NoSelection);
+        list->setSelectionMode(QAbstractItemView::SingleSelection);
         
         scrollLayout->addWidget(btn);
         scrollLayout->addWidget(list);
@@ -540,6 +542,8 @@ void MainWindow::setupChattersTab() {
                 .arg(title)
                 .arg(list->count()));
         });
+
+        connect(list, &QListWidget::itemSelectionChanged, this, &MainWindow::onListSelectionChanged);
     };
 
     createAccordion(m_btnToggleAll, m_listAll, "すべて");
@@ -555,6 +559,11 @@ void MainWindow::setupChattersTab() {
 
     // 更新ボタンのシグナル接続
     connect(m_btnUpdateChatters, &QPushButton::clicked, this, &MainWindow::chatterRefreshRequested);
+
+    m_originalWindowTitle = windowTitle();
+    m_shoutoutCooldownTimer = new QTimer(this);
+    m_shoutoutCooldownTimer->setInterval(1000);
+    connect(m_shoutoutCooldownTimer, &QTimer::timeout, this, &MainWindow::onShoutoutCooldownTimeout);
 }
 
 void MainWindow::setUpdateButtonEnabled(bool enabled) {
@@ -563,7 +572,7 @@ void MainWindow::setUpdateButtonEnabled(bool enabled) {
     }
 }
 
-void MainWindow::updateChattersList(const QList<QPair<QString, QString>>& chatters) {
+void MainWindow::updateChattersList(const QList<TwitchEvents::ChatterInfo>& chatters) {
     if (!m_listAll) return;
 
     m_listAll->clear();
@@ -579,23 +588,44 @@ void MainWindow::updateChattersList(const QList<QPair<QString, QString>>& chatte
         lowerBots.append(b.toLower());
     }
 
-    for (const auto& pair : chatters) {
-        QString name = pair.first;
-        QString role = pair.second;
+    auto connectWidget = [this](ChatterRowWidget* w) {
+        connect(w, &ChatterRowWidget::shoutoutClicked, this, &MainWindow::onChatterShoutoutClicked);
+        connect(w, &ChatterRowWidget::vipToggled, this, &MainWindow::onChatterVipToggled);
+        connect(w, &ChatterRowWidget::moderatorToggled, this, &MainWindow::onChatterModeratorToggled);
+        connect(w, &ChatterRowWidget::timeoutClicked, this, &MainWindow::onChatterTimeoutClicked);
+        connect(w, &ChatterRowWidget::banToggled, this, &MainWindow::onChatterBanToggled);
+    };
 
-        m_listAll->addItem(name);
+    for (const auto& chatter : chatters) {
+        QString name = chatter.userName;
+        QString role = chatter.userBadge;
 
+        QListWidget* targetList = m_listRegular;
         if (lowerBots.contains(name.toLower())) {
-            m_listBot->addItem(name);
+            targetList = m_listBot;
         } else if (role == "broadcaster") {
-            m_listBroadcaster->addItem(name);
+            targetList = m_listBroadcaster;
         } else if (role == "moderator") {
-            m_listModerator->addItem(name);
+            targetList = m_listModerator;
         } else if (role == "vip") {
-            m_listVip->addItem(name);
-        } else {
-            m_listRegular->addItem(name);
+            targetList = m_listVip;
         }
+
+        // すべてリストに追加
+        QListWidgetItem* itemAll = new QListWidgetItem(m_listAll);
+        itemAll->setSizeHint(QSize(0, 38));
+        ChatterRowWidget* widgetAll = new ChatterRowWidget(chatter.userId, chatter.userName, chatter.userBadge, m_listAll);
+        widgetAll->setShoutoutButtonEnabled(m_shoutoutCooldownRemaining <= 0);
+        m_listAll->setItemWidget(itemAll, widgetAll);
+        connectWidget(widgetAll);
+        
+        // 対象のカテゴリリストに追加
+        QListWidgetItem* itemTarget = new QListWidgetItem(targetList);
+        itemTarget->setSizeHint(QSize(0, 38));
+        ChatterRowWidget* widgetTarget = new ChatterRowWidget(chatter.userId, chatter.userName, chatter.userBadge, targetList);
+        widgetTarget->setShoutoutButtonEnabled(m_shoutoutCooldownRemaining <= 0);
+        targetList->setItemWidget(itemTarget, widgetTarget);
+        connectWidget(widgetTarget);
     }
 
     // 各アコーディオンボタンのテキスト更新
@@ -614,4 +644,131 @@ void MainWindow::updateChattersList(const QList<QPair<QString, QString>>& chatte
     updateBtnText(m_btnToggleRegular, m_listRegular, "一般");
 
     m_labelLastUpdate->setText("最終更新: " + QDateTime::currentDateTime().toString("HH:mm:ss"));
+}
+
+void MainWindow::onChatterShoutoutClicked(const QString& userId, const QString& userName) {
+    Q_UNUSED(userName);
+    if (m_shoutoutCooldownRemaining > 0) return;
+
+    emit chatterShoutoutRequested(userId);
+
+    m_shoutoutCooldownRemaining = 120; // 2分間
+    updateShoutoutButtonsEnabled(false);
+    m_shoutoutCooldownTimer->start();
+    onShoutoutCooldownTimeout(); // 初回描画
+}
+
+void MainWindow::onChatterVipToggled(const QString& userId, const QString& userName, bool checked) {
+    Q_UNUSED(userName);
+    emit chatterVipToggled(userId, checked);
+}
+
+void MainWindow::onChatterModeratorToggled(const QString& userId, const QString& userName, bool checked) {
+    ChatterRowWidget* row = qobject_cast<ChatterRowWidget*>(sender());
+    
+    QString msg = checked 
+        ? QString("本当に %1 をモデレーターに任命しますか？").arg(userName)
+        : QString("本当に %1 からモデレーター権限を剥奪しますか？").arg(userName);
+        
+    auto res = QMessageBox::question(this, "モデレーター権限変更", msg, QMessageBox::Yes | QMessageBox::No);
+    if (res == QMessageBox::Yes) {
+        emit chatterModeratorToggled(userId, checked);
+    } else {
+        if (row) {
+            row->updateButtonsFromBadge(row->userBadge()); // 以前の状態に戻す
+        }
+    }
+}
+
+void MainWindow::onChatterTimeoutClicked(const QString& userId, const QString& userName) {
+    bool ok;
+    int minutes = QInputDialog::getInt(this, "タイムアウト時間設定", 
+                                       QString("%1 をタイムアウトする時間（分）を入力してください:").arg(userName), 
+                                       10, 1, 1440, 1, &ok);
+    if (ok) {
+        int seconds = minutes * 60;
+        QString confirmMsg = QString("本当に %1 を %2 分間タイムアウトしますか？").arg(userName).arg(minutes);
+        auto res = QMessageBox::question(this, "タイムアウト確認", confirmMsg, QMessageBox::Yes | QMessageBox::No);
+        if (res == QMessageBox::Yes) {
+            emit chatterTimeoutRequested(userId, seconds);
+        }
+    }
+}
+
+void MainWindow::onChatterBanToggled(const QString& userId, const QString& userName, bool checked) {
+    ChatterRowWidget* row = qobject_cast<ChatterRowWidget*>(sender());
+    
+    if (checked) {
+        QString msg = QString("本当に %1 を永久BANしますか？\n(過去のチャットもすべて削除されます)").arg(userName);
+        auto res = QMessageBox::question(this, "永久BAN確認", msg, QMessageBox::Yes | QMessageBox::No);
+        if (res == QMessageBox::Yes) {
+            emit chatterBanToggled(userId, true);
+        } else {
+            if (row) {
+                row->updateButtonsFromBadge(row->userBadge()); // 戻す
+            }
+        }
+    } else {
+        emit chatterBanToggled(userId, false); // アンBAN
+    }
+}
+
+void MainWindow::onListSelectionChanged() {
+    QListWidget* senderList = qobject_cast<QListWidget*>(sender());
+    if (!senderList) return;
+
+    QListWidgetItem* selectedItem = senderList->currentItem();
+    ChatterRowWidget* selectedRow = selectedItem ? qobject_cast<ChatterRowWidget*>(senderList->itemWidget(selectedItem)) : nullptr;
+    QString selectedUserId = selectedRow ? selectedRow->userId() : "";
+
+    QListWidget* lists[] = { m_listAll, m_listBroadcaster, m_listModerator, m_listVip, m_listBot, m_listRegular };
+    for (QListWidget* list : lists) {
+        if (!list) continue;
+        
+        // 他のリストで選択されている行も同じユーザーIDであれば選択状態にし、そうでなければ選択状態を外す
+        for (int i = 0; i < list->count(); ++i) {
+            QListWidgetItem* item = list->item(i);
+            ChatterRowWidget* row = qobject_cast<ChatterRowWidget*>(list->itemWidget(item));
+            if (row) {
+                bool isSelectedUser = (!selectedUserId.isEmpty() && row->userId() == selectedUserId);
+                row->setSelectedState(isSelectedUser);
+                
+                // 表示状態の選択ハイライトも連動
+                if (list != senderList) {
+                    list->blockSignals(true);
+                    item->setSelected(isSelectedUser);
+                    list->blockSignals(false);
+                }
+            }
+        }
+    }
+}
+
+void MainWindow::onShoutoutCooldownTimeout() {
+    m_shoutoutCooldownRemaining--;
+    if (m_shoutoutCooldownRemaining <= 0) {
+        m_shoutoutCooldownTimer->stop();
+        setWindowTitle(m_originalWindowTitle);
+        updateShoutoutButtonsEnabled(true);
+    } else {
+        int min = m_shoutoutCooldownRemaining / 60;
+        int sec = m_shoutoutCooldownRemaining % 60;
+        setWindowTitle(m_originalWindowTitle + QString(" (シャウトアウト残り %1:%2)")
+                       .arg(min)
+                       .arg(sec, 2, 10, QChar('0')));
+    }
+}
+
+void MainWindow::updateShoutoutButtonsEnabled(bool enabled) {
+    QListWidget* lists[] = { m_listAll, m_listBroadcaster, m_listModerator, m_listVip, m_listBot, m_listRegular };
+    for (QListWidget* list : lists) {
+        if (!list) continue;
+        for (int i = 0; i < list->count(); ++i) {
+            QListWidgetItem* item = list->item(i);
+            ChatterRowWidget* row = qobject_cast<ChatterRowWidget*>(list->itemWidget(item));
+            if (row) {
+                row->setShoutoutButtonEnabled(enabled);
+            }
+        }
+    }
 }

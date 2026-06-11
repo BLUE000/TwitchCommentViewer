@@ -101,6 +101,11 @@ void AppController::initialize() {
             connect(m_mainWindow, &MainWindow::botSettingsChanged, this, &AppController::updateBotUsers);
             connect(m_mainWindow, &MainWindow::tabChanged, this, &AppController::onTabWidgetChanged);
             connect(m_mainWindow, &MainWindow::chatterRefreshRequested, this, &AppController::triggerChattersFetch);
+            connect(m_mainWindow, &MainWindow::chatterShoutoutRequested, this, &AppController::onChatterShoutoutRequested);
+            connect(m_mainWindow, &MainWindow::chatterVipToggled, this, &AppController::onChatterVipToggled);
+            connect(m_mainWindow, &MainWindow::chatterModeratorToggled, this, &AppController::onChatterModeratorToggled);
+            connect(m_mainWindow, &MainWindow::chatterTimeoutRequested, this, &AppController::onChatterTimeoutRequested);
+            connect(m_mainWindow, &MainWindow::chatterBanToggled, this, &AppController::onChatterBanToggled);
             
             // MainWindowへDB参照を渡し、履歴をロード
             m_mainWindow->setDatabaseManager(m_dbManager.get());
@@ -281,5 +286,39 @@ void AppController::triggerChattersFetch() {
             m_mainWindow->setUpdateButtonEnabled(false);
         }
         m_twitchCollector->requestChatters();
+    }
+}
+
+void AppController::onChatterShoutoutRequested(const QString& targetUserId) {
+    if (m_twitchCollector) {
+        m_twitchCollector->sendShoutout(targetUserId);
+    }
+}
+
+void AppController::onChatterVipToggled(const QString& targetUserId, bool enable) {
+    if (m_twitchCollector) {
+        m_twitchCollector->setVipStatus(targetUserId, enable);
+    }
+}
+
+void AppController::onChatterModeratorToggled(const QString& targetUserId, bool enable) {
+    if (m_twitchCollector) {
+        m_twitchCollector->setModeratorStatus(targetUserId, enable);
+    }
+}
+
+void AppController::onChatterTimeoutRequested(const QString& targetUserId, int duration) {
+    if (m_twitchCollector) {
+        m_twitchCollector->banUser(targetUserId, duration);
+    }
+}
+
+void AppController::onChatterBanToggled(const QString& targetUserId, bool enable) {
+    if (m_twitchCollector) {
+        if (enable) {
+            m_twitchCollector->banUser(targetUserId, 0); // 0 is perm ban
+        } else {
+            m_twitchCollector->unbanUser(targetUserId);
+        }
     }
 }

@@ -15,8 +15,8 @@ ConfigManager::ConfigManager(QObject* parent)
     : QObject(parent), m_httpServer(new QTcpServer(this)) 
 {
     // アプリケーション起動ごとのセキュアな固定鍵 (実運用ではOSのKeychain等から取得するのが理想)
-    // v2: スコープ変更に伴い、旧バージョンのトークンを無効化して再認証を強制する
-    m_cipherKey = "twitch_oauth_secure_key_v2";
+    // v3: スコープ変更に伴い、旧バージョンのトークンを無効化して再認証を強制する
+    m_cipherKey = "twitch_oauth_secure_key_v3";
 
     connect(m_httpServer, &QTcpServer::newConnection, this, &ConfigManager::onNewConnection);
 }
@@ -152,7 +152,7 @@ void ConfigManager::startOAuthFlow() {
                               "?response_type=token"
                               "&client_id=%1"
                               "&redirect_uri=%2"
-                              "&scope=user:read:chat%20user:write:chat")
+                              "&scope=user:read:chat%20user:write:chat%20moderator:read:chatters%20moderator:manage:shoutouts%20channel:manage:vips%20channel:manage:moderators%20moderator:manage:banned_users")
                           .arg(m_clientId)
                           .arg(m_redirectUri);
                           

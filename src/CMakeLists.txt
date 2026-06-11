@@ -26,6 +26,8 @@ set(SOURCES
     modules/ConfigManager.h
     modules/BouyomiIntegrationImpl.cpp
     modules/BouyomiIntegrationImpl.h
+    modules/ChatterRowWidget.cpp
+    modules/ChatterRowWidget.h
 )
 
 add_executable(TwitchCommentManager WIN32 ${SOURCES})

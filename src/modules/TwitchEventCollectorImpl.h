@@ -14,6 +14,11 @@ public:
     void connectToTwitch() override;
     void disconnectFromTwitch() override;
     void requestChatters() override;
+    void sendShoutout(const QString& toBroadcasterId) override;
+    void setVipStatus(const QString& targetUserId, bool enable) override;
+    void setModeratorStatus(const QString& targetUserId, bool enable) override;
+    void banUser(const QString& targetUserId, int duration, const QString& reason = "") override;
+    void unbanUser(const QString& targetUserId) override;
 
     // 認証情報をセットする
     void setAuthData(const QString& clientId, const QString& accessToken);

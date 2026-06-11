@@ -49,6 +49,12 @@ private:
     void onTabWidgetChanged(int index);
     void onChattersTimerTimeout();
     void triggerChattersFetch();
+
+    void onChatterShoutoutRequested(const QString& targetUserId);
+    void onChatterVipToggled(const QString& targetUserId, bool enable);
+    void onChatterModeratorToggled(const QString& targetUserId, bool enable);
+    void onChatterTimeoutRequested(const QString& targetUserId, int duration);
+    void onChatterBanToggled(const QString& targetUserId, bool enable);
     
     // UI通知用の中継メソッド（解析タブ用）
     void emitSpamDetected(const QString& username, const QString& reason, const QString& message);

@@ -14,6 +14,7 @@
 #include <QListWidget>
 #include <QLabel>
 #include <QPushButton>
+#include "events/TwitchEvents.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -43,6 +44,11 @@ signals:
     void botSettingsChanged(const QStringList& bots);
     void tabChanged(int index);
     void chatterRefreshRequested();
+    void chatterShoutoutRequested(const QString& targetUserId);
+    void chatterVipToggled(const QString& targetUserId, bool enable);
+    void chatterModeratorToggled(const QString& targetUserId, bool enable);
+    void chatterTimeoutRequested(const QString& targetUserId, int duration);
+    void chatterBanToggled(const QString& targetUserId, bool enable);
 
 private slots:
     void on_btnStartAuth_clicked();
@@ -66,10 +72,18 @@ private slots:
 public slots:
     void appendAnalysisLog(const QString& logMsg);
     void updateStatistics(int totalComments, const QMap<QString, int>& userCounts, const QString& latestUser = "", const QDateTime& latestTime = QDateTime());
-    void updateChattersList(const QList<QPair<QString, QString>>& chatters);
+    void updateChattersList(const QList<TwitchEvents::ChatterInfo>& chatters);
     void setUpdateButtonEnabled(bool enabled);
 
 private slots:
+    void onChatterShoutoutClicked(const QString& userId, const QString& userName);
+    void onChatterVipToggled(const QString& userId, const QString& userName, bool checked);
+    void onChatterModeratorToggled(const QString& userId, const QString& userName, bool checked);
+    void onChatterTimeoutClicked(const QString& userId, const QString& userName);
+    void onChatterBanToggled(const QString& userId, const QString& userName, bool checked);
+    void onListSelectionChanged();
+    void onShoutoutCooldownTimeout();
+
     void onChartConfigChanged();
     void on_btnLaunchDbViewer_clicked();
     void updateChartDisplay();
@@ -115,5 +129,11 @@ private:
     QListWidget* m_listBot = nullptr;
     QPushButton* m_btnToggleRegular = nullptr;
     QListWidget* m_listRegular = nullptr;
+
+    QTimer* m_shoutoutCooldownTimer = nullptr;
+    int m_shoutoutCooldownRemaining = 0;
+    QString m_originalWindowTitle;
+
+    void updateShoutoutButtonsEnabled(bool enabled);
 };
 #endif // MAINWINDOW_H

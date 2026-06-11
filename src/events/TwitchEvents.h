@@ -2,9 +2,14 @@
 #include <QEvent>
 #include <QString>
 #include <QList>
-#include <QPair>
 
 namespace TwitchEvents {
+
+struct ChatterInfo {
+    QString userId;
+    QString userName;
+    QString userBadge;
+};
 
 // 独自のQEvent::Typeを登録 (1000以降を安全に利用するため registerEventType を使用)
 // inlineだと翻訳単位ごとに異なるIDが振られる事故を防ぐため関数でくるむ
@@ -39,15 +44,16 @@ private:
 
 class ChattersEvent : public QEvent {
 public:
-    explicit ChattersEvent(const QList<QPair<QString, QString>>& chatters)
+    explicit ChattersEvent(const QList<ChatterInfo>& chatters)
         : QEvent(chattersReceivedType())
         , m_chatters(chatters)
     {}
 
-    QList<QPair<QString, QString>> chatters() const { return m_chatters; }
+    QList<ChatterInfo> chatters() const { return m_chatters; }
 
 private:
-    QList<QPair<QString, QString>> m_chatters;
+    QList<ChatterInfo> m_chatters;
 };
 
 } // namespace TwitchEvents
+
