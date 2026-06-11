@@ -8,6 +8,7 @@
 #include "events/TwitchEvents.h"
 #include "MainWindow.h"
 #include <QDebug>
+#include <QMessageBox>
 
 AppController::AppController(QObject* parent) : QObject(parent) {
     m_configManager = std::make_unique<ConfigManager>(this);
@@ -79,8 +80,19 @@ void AppController::initialize() {
                     impl->setAuthData(m_configManager->getClientId(), m_configManager->getAccessToken());
                 }
                 m_twitchCollector->connectToTwitch();
+
+                if (m_mainWindow) {
+                    QMessageBox::information(m_mainWindow, "認証成功",
+                        "Twitchとの連携認証に成功しました！\n"
+                        "アクセストークンを安全に暗号化して保存しました。自動接続を開始します。");
+                }
             } else {
                 qWarning() << "OAuth Authentication Failed:" << errorMsg;
+                if (m_mainWindow) {
+                    QMessageBox::critical(m_mainWindow, "認証失敗",
+                        "Twitchとの連携認証に失敗しました。\n"
+                        "エラー: " + errorMsg);
+                }
             }
         });
         
