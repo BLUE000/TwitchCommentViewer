@@ -38,3 +38,4 @@ trustchain_credentials.cmake
 *.db
 WIP_STATE.md
 *.py
+release_package/
