@@ -13,6 +13,10 @@
 #include "events/TwitchEvents.h"
 #include "modules/DatabaseManager.h"
 #include "modules/ConfigManager.h"
+#include <QNetworkAccessManager>
+#include <QIcon>
+#include <QHash>
+#include <QSet>
 
 class MainWindow;
 
@@ -61,4 +65,12 @@ private:
     void emitTrendWordDetected(const QString& word, int count);
     void emitEmotionScored(const QString& username, const QString& message, double score);
     void emitStatisticsUpdated(int totalComments, const QMap<QString, int>& userCounts, const QString& latestUser, const QDateTime& latestTime);
+
+    // アバター取得用
+    std::unique_ptr<QNetworkAccessManager> m_nam;
+    QHash<QString, QIcon> m_avatarCache;
+    QSet<QString> m_pendingAvatars;
+
+    void fetchAvatar(const QString& userId);
+    void downloadAvatarImage(const QString& userId, const QString& urlStr);
 };

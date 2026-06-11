@@ -32,7 +32,7 @@ public:
     ~MainWindow();
 
     // UIのテーブルにコメントを追加する
-    void addCommentToView(const QString& username, const QString& message);
+    void addCommentToView(const QString& userId, const QString& username, const QString& message, const QIcon& icon, const QStringList& badges);
     void setConfigManager(ConfigManager* configManager);
     void setDatabaseManager(DatabaseManager* dbManager);
     void loadHistoryFromDb();
@@ -75,6 +75,7 @@ public slots:
     void updateChattersList(const QList<TwitchEvents::ChatterInfo>& chatters);
     void setUpdateButtonEnabled(bool enabled);
     void showStatusMessage(const QString& message, int timeoutMs = 5000);
+    void updateAvatarIcon(const QString& userId, const QIcon& icon);
 
 private slots:
     void onChatterShoutoutClicked(const QString& userId, const QString& userName);

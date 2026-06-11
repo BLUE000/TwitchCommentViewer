@@ -9,6 +9,42 @@
 #include "MainWindow.h"
 #include <QDebug>
 #include <QMessageBox>
+#include <QNetworkRequest>
+#include <QNetworkReply>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QPainter>
+#include <QPainterPath>
+// アバター画像処理用ヘルパー
+static QPixmap getCircularPixmap(const QPixmap& src) {
+    QPixmap target(src.size());
+    target.fill(Qt::transparent);
+    QPainter painter(&target);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    QPainterPath path;
+    path.addEllipse(0, 0, src.width(), src.height());
+    painter.setClipPath(path);
+    painter.drawPixmap(0, 0, src);
+    return target;
+}
+
+static QIcon getPlaceholderIcon() {
+    static QIcon placeholder;
+    if (placeholder.isNull()) {
+        QPixmap pix(32, 32);
+        pix.fill(Qt::transparent);
+        QPainter painter(&pix);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setBrush(QColor(180, 180, 180));
+        painter.setPen(Qt::NoPen);
+        painter.drawEllipse(0, 0, 32, 32);
+        placeholder = QIcon(pix);
+    }
+    return placeholder;
+}
+
 
 AppController::AppController(QObject* parent) : QObject(parent) {
     m_configManager = std::make_unique<ConfigManager>(this);
@@ -177,11 +213,24 @@ void AppController::customEvent(QEvent* event) {
             }
         }
 
+        // アバター画像の非同期取得・キャッシュ制御
+        QString userId = commentEvent->userId();
+        QIcon avatarIcon;
+        if (m_avatarCache.contains(userId)) {
+            avatarIcon = m_avatarCache[userId];
+        } else {
+            avatarIcon = getPlaceholderIcon();
+            if (!m_pendingAvatars.contains(userId)) {
+                m_pendingAvatars.insert(userId);
+                fetchAvatar(userId);
+            }
+        }
+
         // UIへの反映処理
         if (m_mainWindow) {
             // QtのGUIスレッドから安全にUIを更新
-            QMetaObject::invokeMethod(m_mainWindow, [this, name = commentEvent->userName(), msg = safeMessage]() {
-                m_mainWindow->addCommentToView(name, msg);
+            QMetaObject::invokeMethod(m_mainWindow, [this, userId, name = commentEvent->userName(), msg = safeMessage, avatarIcon, badges = commentEvent->badges()]() {
+                m_mainWindow->addCommentToView(userId, name, msg, avatarIcon, badges);
             }, Qt::QueuedConnection);
         }
     } else if (event->type() == TwitchEvents::chattersReceivedType()) {
@@ -331,4 +380,74 @@ void AppController::onChatterBanToggled(const QString& targetUserId, bool enable
             m_twitchCollector->unbanUser(targetUserId);
         }
     }
+}
+
+void AppController::fetchAvatar(const QString& userId) {
+    if (!m_configManager) return;
+    QString clientId = m_configManager->getClientId();
+    QString token = m_configManager->getAccessToken();
+    if (clientId.isEmpty() || token.isEmpty()) return;
+
+    if (!m_nam) {
+        m_nam = std::make_unique<QNetworkAccessManager>(this);
+    }
+
+    QUrl url("https://api.twitch.tv/helix/users?id=" + userId);
+    QNetworkRequest request(url);
+    request.setRawHeader("Authorization", ("Bearer " + token).toUtf8());
+    request.setRawHeader("Client-Id", clientId.toUtf8());
+
+    QNetworkReply* reply = m_nam->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, userId]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+            if (!doc.isNull() && doc.isObject()) {
+                QJsonArray data = doc.object()["data"].toArray();
+                if (!data.isEmpty()) {
+                    QString imgUrl = data.first().toObject()["profile_image_url"].toString();
+                    if (!imgUrl.isEmpty()) {
+                        downloadAvatarImage(userId, imgUrl);
+                        reply->deleteLater();
+                        return; // successfully went to download
+                    }
+                }
+            }
+        } else {
+            qWarning() << "Failed to fetch user profile for avatar:" << reply->errorString();
+        }
+        m_pendingAvatars.remove(userId);
+        reply->deleteLater();
+    });
+}
+
+void AppController::downloadAvatarImage(const QString& userId, const QString& urlStr) {
+    if (!m_nam) return;
+    QNetworkRequest request = QNetworkRequest(QUrl(urlStr));
+    QNetworkReply* reply = m_nam->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, userId]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            QByteArray data = reply->readAll();
+            QPixmap pixmap;
+            if (pixmap.loadFromData(data)) {
+                QPixmap circular = getCircularPixmap(pixmap);
+                QIcon icon(circular);
+                
+                m_avatarCache[userId] = icon;
+                m_pendingAvatars.remove(userId);
+
+                // UIの既存行を更新
+                if (m_mainWindow) {
+                    QMetaObject::invokeMethod(m_mainWindow, [this, userId, icon]() {
+                        m_mainWindow->updateAvatarIcon(userId, icon);
+                    }, Qt::QueuedConnection);
+                }
+            } else {
+                m_pendingAvatars.remove(userId);
+            }
+        } else {
+            qWarning() << "Failed to download avatar image:" << reply->errorString();
+            m_pendingAvatars.remove(userId);
+        }
+        reply->deleteLater();
+    });
 }

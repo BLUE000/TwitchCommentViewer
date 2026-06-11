@@ -86,11 +86,21 @@ void TwitchEventCollectorImpl::processNotification(const QJsonObject& json) {
         QJsonObject messageObj = eventObj["message"].toObject();
         QString text = messageObj["text"].toString();
 
+        QStringList badges;
+        QJsonArray badgesArr = eventObj["badges"].toArray();
+        for (const QJsonValue& val : badgesArr) {
+            QJsonObject badgeObj = val.toObject();
+            QString setId = badgeObj["set_id"].toString();
+            if (!setId.isEmpty()) {
+                badges.append(setId);
+            }
+        }
+
         // 【要件定義対応】: シグナルを使わず、Event割り込み(postEvent)でターゲットに非同期送信
         if (m_eventTarget) {
-            auto* evt = new TwitchEvents::CommentEvent(userId, userName, text);
+            auto* evt = new TwitchEvents::CommentEvent(userId, userName, text, badges);
             QCoreApplication::postEvent(m_eventTarget, evt);
-            qDebug() << "Dispatched CommentEvent for user:" << userName;
+            qDebug() << "Dispatched CommentEvent for user:" << userName << "with badges:" << badges;
         }
     }
 }

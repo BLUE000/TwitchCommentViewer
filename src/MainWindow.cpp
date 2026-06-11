@@ -107,14 +107,51 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-void MainWindow::addCommentToView(const QString& username, const QString& message) {
-    int newRow = m_chatModel->rowCount();
-    m_chatModel->insertRow(newRow);
-    m_chatModel->setData(m_chatModel->index(newRow, 0), username);
-    m_chatModel->setData(m_chatModel->index(newRow, 1), message);
+void MainWindow::addCommentToView(const QString& userId, const QString& username, const QString& message, const QIcon& icon, const QStringList& badges) {
+    auto getBadgeEmoji = [](const QString& badge) -> QString {
+        if (badge == "broadcaster") return "👑";
+        if (badge == "moderator") return "🛡️";
+        if (badge == "vip") return "💎";
+        if (badge == "subscriber") return "⭐";
+        if (badge == "artist") return "🎨";
+        return "";
+    };
+
+    QString displayName = username;
+    if (!badges.isEmpty()) {
+        QString badgeStr;
+        for (const QString& b : badges) {
+            QString emoji = getBadgeEmoji(b);
+            if (!emoji.isEmpty()) {
+                badgeStr += emoji;
+            }
+        }
+        if (!badgeStr.isEmpty()) {
+            displayName += " " + badgeStr;
+        }
+    }
+
+    auto* userItem = new QStandardItem(displayName);
+    userItem->setIcon(icon);
+    userItem->setData(userId, Qt::UserRole);
+
+    auto* msgItem = new QStandardItem(message);
+
+    m_chatModel->appendRow({userItem, msgItem});
     
     // 最新コメントへ自動スクロール
     ui->tableViewComments->scrollToBottom();
+}
+
+void MainWindow::updateAvatarIcon(const QString& userId, const QIcon& icon) {
+    for (int i = 0; i < m_chatModel->rowCount(); ++i) {
+        QModelIndex idx = m_chatModel->index(i, 0);
+        if (m_chatModel->data(idx, Qt::UserRole).toString() == userId) {
+            if (auto* item = m_chatModel->item(i, 0)) {
+                item->setIcon(icon);
+            }
+        }
+    }
 }
 
 void MainWindow::on_btnStartAuth_clicked() {
