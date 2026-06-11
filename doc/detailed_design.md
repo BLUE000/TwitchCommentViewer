@@ -18,12 +18,22 @@
 * **基盤**: `QMainWindow`
 * **セキュリティ対応**: 
   * アプリ起動時に `TrustChain::QtHelper::applyWatermark(&w, status)` を適用。改ざんやオフライン状態が検知された場合は、タイトルバーに `(Custom Build)` を付与し、ステータスバーに消去不可の権利表記を強制表示する。
-* **メイン領域**: `QTabWidget`（以下の3タブ構成）
-  1. **ビューワタブ**: `QTableView` または `QListView`（コメントをリアルタイム表示）
-  2. **解析タブ**: 
+* **メイン領域**: `QTabWidget`（以下の4タブ構成）
+  1. **コメントタブ**: `QTableView` または `QListView`（コメントをリアルタイム表示、旧ビューワタブ）
+  2. **視聴者タブ**: 
+     * 手動「更新」ボタン、および最終更新時間ラベル。
+     * `QScrollArea` と 6つのアコーディオン（すべて/ストリーマー/モデレーター/VIP/チャットボット/一般）。
+     * 各アコーディオンは `QPushButton`（トグル）と `QListWidget` で構成。
+     * ストリーマーを除く視聴者行にカスタム行ウィジェット（`ChatterRowWidget`）を配置し、マウスホバー時または行選択時に右端にアクションボタンを表示。
+       - `[シャウトアウト] [VIP] [モデレータ]  (余白)  [タイムアウト] [BAN]` の配置と余白制御。
+       - VIP・モデレータ・BANはトグル動作とし、状態を表現。
+       - タイムアウト時は時間指定ダイアログを起動。
+       - モデレータ追加/削除、タイムアウト決定後、BAN時には実行確認メッセージ（`QMessageBox`）を表示。
+       - シャウトアウト時は、2分間のクールタイム表示（ウィンドウタイトルバーでのリアルタイムカウントダウン）を制御。
+  3. **解析タブ**: 
      * `QTextBrowser`（トレンド・スパム等のログ表示）
      * `QtCharts`を用いた折れ線グラフ（単位時間あたりの総コメント数、または特定ユーザーごとのコメント推移を表示。粒度変更やTopN絞り込みに対応）
-  3. **設定タブ**: Twitch接続設定、BOT設定、**権利・ライセンス表記**（ここにTrustChain・Qt等のライセンスを記載）
+  4. **設定タブ**: Twitch接続設定、BOT設定、**権利・ライセンス表記**（ここにTrustChain・Qt等のライセンスを記載）
 * **下部領域**: `QStatusBar`（接続状態やシステムメッセージの表示）
 
 ## 3. データ保護とデータベーススキーマ設計
@@ -60,6 +70,12 @@
 * `ITwitchEventCollector` (Interface)
   * `virtual void connectToTwitch() = 0;`
   * `virtual void disconnectFromTwitch() = 0;`
+  * `virtual void requestChatters() = 0;`
+  * `virtual void sendShoutout(const QString& toBroadcasterId) = 0;`
+  * `virtual void setVipStatus(const QString& targetUserId, bool enable) = 0;`
+  * `virtual void setModeratorStatus(const QString& targetUserId, bool enable) = 0;`
+  * `virtual void banUser(const QString& targetUserId, int duration, const QString& reason = "") = 0;`
+  * `virtual void unbanUser(const QString& targetUserId) = 0;;`
 * `ITwitchActionSender` (Interface)
   * `virtual void sendChatMessage(const QString& message) = 0;`
   * `virtual void updateChannelPointStatus(const QString& redemptionId, bool fulfill) = 0;`
@@ -89,6 +105,18 @@
 3. `QMetaObject::invokeMethod(appController, "onCommentReceived", Qt::QueuedConnection, Q_ARG(CommentData, data))` をコール。
 4. `AppController` は非同期（QueuedConnection）で各ワーカースレッドへディスパッチ。
 5. 解析やDB保存が別スレッドで並行処理される。
+
+**【視聴者操作およびモデレーションアクションシーケンス】**
+1. アプリケーションで「視聴者」タブがアクティブ化される、または10分タイマーが作動する。
+2. `AppController` は `m_twitchCollector->requestChatters()` を実行。
+3. `TwitchEventCollectorImpl` は `GET /chat/chatters` を呼び出し、レスポンスから `user_id`, `user_name`, `user_badge` を含んだ `ChatterInfo` のリストを構築して `ChattersEvent` を `AppController` へポスト。
+4. `AppController` は `MainWindow::updateChattersList` を呼び出し、各アコーディオン内の `QListWidget` に `ChatterRowWidget` を動的バインド。各アイテムの `Qt::UserRole` 等にIDとバッジ情報を格納。
+5. ユーザーが視聴者行にホバー/クリックし、表示されたアクションボタンを選択。
+   - **シャウトアウト**: `sendShoutout` APIを発行し、2分間のカウントダウンをタイトルバーに表示。
+   - **VIP / モデレータトグル**: 確認後（モデレータのみ）、トグル状態に応じて `setVipStatus` / `setModeratorStatus` APIを実行。
+   - **タイムアウト**: タイムアウト時間設定ダイアログで時間入力後、確認メッセージ表示。承認後 `banUser(userId, duration)` APIを実行。
+   - **BAN**: 確認メッセージ表示後、`banUser(userId, 0)` APIを実行。
+6. 各API実行完了時、UIのトグル状態やリスト表示を同期。
 
 ## 6. 付属ツール: ログ復号ビューワ (DB Viewer)
 
