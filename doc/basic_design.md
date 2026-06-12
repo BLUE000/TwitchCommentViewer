@@ -49,7 +49,7 @@
 
 #### 内部処理モジュール
 5. **データ管理モジュール (`DatabaseManager`)**
-   - `TransCipher-Dist` ライブラリを用いたデータの暗号化・復号と、SQLiteへの書き込み・読み込み。
+   - `TransCipher-Dist` ライブラリを用いたデータの難読化と、SQLiteへの書き込み・読み込み。
 6. **設定管理モジュール (`ConfigManager`)**
    - 安全なOAuthトークン管理のために、Windows環境ではOSの **DPAPI (Data Protection API)** を使用して資格情報を暗号化。非Windows環境では `TransCipher-Dist` にフォールバックする。
    - アナウンス送信用に新しいOAuthスコープ `moderator:manage:announcements` を含めて認可フローを起動する。
