@@ -60,9 +60,10 @@ bool DatabaseManager::logComment(const QString& userId, const QString& userName,
 
     // 2. SQLiteへのセキュアな書き込み
     QSqlQuery query(m_db);
-    query.prepare("INSERT INTO chat_logs (user_id, username_enc, message_enc, sentiment_score, is_spam) "
-                  "VALUES (:userId, :userName, :message, :score, :spam)");
+    query.prepare("INSERT INTO chat_logs (timestamp, user_id, username_enc, message_enc, sentiment_score, is_spam) "
+                  "VALUES (:timestamp, :userId, :userName, :message, :score, :spam)");
     
+    query.bindValue(":timestamp", QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss"));
     query.bindValue(":userId", userId);
     query.bindValue(":userName", encName.data());
     query.bindValue(":message", encMsg.data());

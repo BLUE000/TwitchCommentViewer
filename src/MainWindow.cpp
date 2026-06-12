@@ -766,7 +766,7 @@ void MainWindow::updateChartDisplay() {
     
     for (const auto& entry : m_commentHistory) {
         qint64 t = entry.time.toMSecsSinceEpoch();
-        qint64 binTime = (t / binSizeMs) * binSizeMs;
+        qint64 binTime = firstTimeRounded + ((t - firstTimeRounded) / binSizeMs) * binSizeMs;
         
         if (typeIdx == 0) {
             binnedData["TOTAL"][binTime]++;
