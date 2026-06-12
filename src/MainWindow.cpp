@@ -319,6 +319,9 @@ void MainWindow::on_btnSaveTts_clicked() {
     m_configManager->setTtsIgnoreUsers(ignoreList);
 
     m_configManager->saveConfig();
+    if (m_controller) {
+        QMetaObject::invokeMethod(m_controller, "reloadTtsIntegration", Qt::QueuedConnection);
+    }
     showStatusMessage("読み上げ設定を保存しました。", 3000);
 }
 

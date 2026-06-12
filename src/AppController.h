@@ -35,6 +35,7 @@ public slots:
     // UIからの要求を処理するスロット
     void startOAuthFlow();
     void ttsTestRequested(const QString& message);
+    void reloadTtsIntegration();
     void onTabWidgetChanged(int index);
     void onChattersTimerTimeout();
     void triggerChattersFetch();

@@ -106,19 +106,7 @@ void AppController::initialize() {
     // 設定を読み込み（ロードの成否に関わらず、一部の値は読み込まれている可能性がある）
     bool configLoaded = m_configManager->loadConfig();
     
-    // activeTtsEngine に基づいて m_ttsIntegration を動的に生成する
-    int engine = m_configManager->activeTtsEngine();
-    if (engine == 1) {
-        m_ttsIntegration = std::make_unique<BouyomiIntegrationImpl>(m_configManager.get(), this);
-    } else if (engine == 2) {
-        m_ttsIntegration = std::make_unique<VoiceVoxIntegrationImpl>(m_configManager.get(), this);
-    } else {
-        m_ttsIntegration = nullptr;
-    }
-
-    if (m_ttsIntegration) {
-        m_ttsIntegration->initialize();
-    }
+    reloadTtsIntegration();
 
     if (m_obsHttpServer) {
         int httpPort = m_configManager->getObsServerPort();
@@ -554,3 +542,21 @@ void AppController::onSendAnnouncementRequested(const QString& message, const QS
         m_twitchCollector->sendAnnouncement(message, color);
     }
 }
+
+void AppController::reloadTtsIntegration() {
+    qInfo() << "Reloading TTS integration (active engine:" << (m_configManager ? m_configManager->activeTtsEngine() : 0) << ")...";
+    m_ttsIntegration.reset(); // 旧モジュールの破棄（自動停止含む）
+
+    if (!m_configManager) return;
+    int engine = m_configManager->activeTtsEngine();
+    if (engine == 1) {
+        m_ttsIntegration = std::make_unique<BouyomiIntegrationImpl>(m_configManager.get(), this);
+    } else if (engine == 2) {
+        m_ttsIntegration = std::make_unique<VoiceVoxIntegrationImpl>(m_configManager.get(), this);
+    }
+
+    if (m_ttsIntegration) {
+        m_ttsIntegration->initialize();
+    }
+}
+
