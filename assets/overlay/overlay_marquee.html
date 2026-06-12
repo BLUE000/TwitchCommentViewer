@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Twitch Comment Overlay (Flow)</title>
+    <link rel="stylesheet" href="style_marquee.css">
+</head>
+<body>
+    <div id="comment-container"></div>
+
+    <script>
+        let wsPort = 8082; // default fallback
+        if (window.location.port) {
+            wsPort = parseInt(window.location.port) + 1;
+        }
+        
+        console.log(`Connecting to WebSocket on port ${wsPort}...`);
+        const ws = new WebSocket('ws://localhost:' + wsPort);
+
+        ws.onopen = () => {
+            console.log('Connected to OBS WebSocket Server (Flow)');
+        };
+
+        const badgeEmojis = {
+            broadcaster: '👑',
+            moderator: '🛡️',
+            vip: '💎',
+            subscriber: '⭐',
+            artist: '🎨'
+        };
+
+        // レーン（高さの衝突防止用）の管理
+        const numLanes = 10;
+        const laneUsage = new Array(numLanes).fill(0); // 各レーンが次に使用可能になるタイムスタンプ(ms)
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            
+            if (data.action === 'comment') {
+                addFlowingComment(data.username, data.message, data.avatarUrl, data.badges);
+            }
+        };
+
+        function addFlowingComment(username, message, avatarUrl, badges) {
+            const container = document.getElementById('comment-container');
+            
+            // コメント要素の作成
+            const commentDiv = document.createElement('div');
+            commentDiv.className = 'comment-flow';
+            
+            // アバター画像
+            if (avatarUrl) {
+                const avatarImg = document.createElement('img');
+                avatarImg.className = 'avatar';
+                avatarImg.src = avatarUrl;
+                commentDiv.appendChild(avatarImg);
+            }
+            
+            // ユーザー名
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'username';
+            nameSpan.textContent = username;
+            commentDiv.appendChild(nameSpan);
+            
+            // バッジ
+            if (badges && badges.length > 0) {
+                const badgesSpan = document.createElement('span');
+                badgesSpan.className = 'badges';
+                badges.forEach(item => {
+                    if (item.startsWith('http')) {
+                        const badgeImg = document.createElement('img');
+                        badgeImg.className = 'badge-icon';
+                        badgeImg.src = item;
+                        badgesSpan.appendChild(badgeImg);
+                    } else {
+                        const emoji = badgeEmojis[item];
+                        if (emoji) {
+                            badgesSpan.textContent += emoji;
+                        }
+                    }
+                });
+                if (badgesSpan.children.length > 0 || badgesSpan.textContent) {
+                    commentDiv.appendChild(badgesSpan);
+                }
+            }
+            
+            // 区切り
+            const separator = document.createTextNode(': ');
+            commentDiv.appendChild(separator);
+            
+            // メッセージ内容
+            const msgSpan = document.createElement('span');
+            msgSpan.className = 'message';
+            msgSpan.textContent = message;
+            commentDiv.appendChild(msgSpan);
+            
+            // 空いている（最も使用日時が古い）レーンを探す
+            const now = Date.now();
+            let selectedLane = 0;
+            let minTime = laneUsage[0];
+            
+            for (let i = 0; i < numLanes; i++) {
+                if (laneUsage[i] < now) {
+                    selectedLane = i;
+                    break;
+                }
+                if (laneUsage[i] < minTime) {
+                    minTime = laneUsage[i];
+                    selectedLane = i;
+                }
+            }
+            
+            // レーンを予約（被らないためのクールダウン間隔2秒）
+            laneUsage[selectedLane] = now + 2000;
+            
+            // 高さを設定 (10レーンに分ける。top: 5% ~ 85% の範囲に配分)
+            const topPercent = 5 + (selectedLane * 8);
+            commentDiv.style.top = topPercent + '%';
+            
+            container.appendChild(commentDiv);
+            
+            // アニメーション完了後に要素を削除
+            commentDiv.addEventListener('animationend', () => {
+                commentDiv.remove();
+            });
+        }
+    </script>
+</body>
+</html>
