@@ -211,6 +211,8 @@ void MainWindow::setConfigManager(ConfigManager* configManager) {
 
     // 共通コントロールに現在のアクティブエンジンの設定値を適用
     if (engine == 2) {
+        ui->spinTtsVolume->setMinimum(0);
+        ui->spinTtsVolume->setMaximum(100);
         ui->spinTtsVolume->setValue(m_configManager->voicevoxVolume());
         
         ui->doubleSpinTtsSpeed->setMinimum(0.5);
@@ -225,6 +227,8 @@ void MainWindow::setConfigManager(ConfigManager* configManager) {
         ui->doubleSpinTtsPitch->setValue(m_configManager->voicevoxPitch());
         ui->labelTtsPitchUnit->setText("");
     } else {
+        ui->spinTtsVolume->setMinimum(-1);
+        ui->spinTtsVolume->setMaximum(100);
         ui->spinTtsVolume->setValue(m_configManager->bouyomiVolume());
         
         ui->doubleSpinTtsSpeed->setMinimum(50);
@@ -381,6 +385,8 @@ void MainWindow::on_radUseBouyomi_toggled(bool checked) {
     }
 
     // UIの表示範囲と値を棒読みちゃん用に切り替え
+    ui->spinTtsVolume->setMinimum(-1);
+    ui->spinTtsVolume->setMaximum(100);
     ui->doubleSpinTtsSpeed->setMinimum(50);
     ui->doubleSpinTtsSpeed->setMaximum(300);
     ui->doubleSpinTtsSpeed->setSingleStep(10);
@@ -410,6 +416,8 @@ void MainWindow::on_radUseVoicevox_toggled(bool checked) {
     }
 
     // UIの表示範囲と値をVOICEVOX用に切り替え
+    ui->spinTtsVolume->setMinimum(0);
+    ui->spinTtsVolume->setMaximum(100);
     ui->doubleSpinTtsSpeed->setMinimum(0.5);
     ui->doubleSpinTtsSpeed->setMaximum(2.0);
     ui->doubleSpinTtsSpeed->setSingleStep(0.1);
