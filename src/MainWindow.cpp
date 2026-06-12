@@ -616,7 +616,7 @@ void MainWindow::loadHistoryFromDb() {
     
     for (const CommentLog& log : logs) {
         LogEntry entry;
-        entry.time = log.timestamp;
+        entry.time = log.timestamp.toLocalTime();
         entry.user = log.userName;
         m_commentHistory.append(entry);
         

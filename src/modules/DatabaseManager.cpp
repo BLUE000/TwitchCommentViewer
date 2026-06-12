@@ -1,4 +1,5 @@
 #include "DatabaseManager.h"
+#include <QTimeZone>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QVariant>
@@ -63,7 +64,7 @@ bool DatabaseManager::logComment(const QString& userId, const QString& userName,
     query.prepare("INSERT INTO chat_logs (timestamp, user_id, username_enc, message_enc, sentiment_score, is_spam) "
                   "VALUES (:timestamp, :userId, :userName, :message, :score, :spam)");
     
-    query.bindValue(":timestamp", QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss"));
+    query.bindValue(":timestamp", QDateTime::currentDateTimeUtc().toString("yyyy-MM-dd HH:mm:ss"));
     query.bindValue(":userId", userId);
     query.bindValue(":userName", encName.data());
     query.bindValue(":message", encMsg.data());
@@ -92,10 +93,10 @@ QList<CommentLog> DatabaseManager::getComments(const QDateTime& start, const QDa
 
     query.prepare(sql);
     if (start.isValid()) {
-        query.bindValue(":start", start.toString(Qt::ISODate));
+        query.bindValue(":start", start.toUTC().toString("yyyy-MM-dd HH:mm:ss"));
     }
     if (end.isValid()) {
-        query.bindValue(":end", end.toString(Qt::ISODate));
+        query.bindValue(":end", end.toUTC().toString("yyyy-MM-dd HH:mm:ss"));
     }
 
     if (!query.exec()) {
@@ -106,7 +107,12 @@ QList<CommentLog> DatabaseManager::getComments(const QDateTime& start, const QDa
     while (query.next()) {
         CommentLog log;
         log.id = query.value(0).toLongLong();
-        log.timestamp = query.value(1).toDateTime();
+        
+        QString tsStr = query.value(1).toString();
+        QDate date = QDate::fromString(tsStr.left(10), "yyyy-MM-dd");
+        QTime time = QTime::fromString(tsStr.mid(11), "HH:mm:ss");
+        log.timestamp = QDateTime(date, time, QTimeZone::utc());
+        
         log.userId = query.value(2).toString();
         
         QByteArray encName = query.value(3).toByteArray();
@@ -135,10 +141,10 @@ bool DatabaseManager::clearHistory(const QDateTime& start, const QDateTime& end)
 
     query.prepare(sql);
     if (start.isValid()) {
-        query.bindValue(":start", start.toString(Qt::ISODate));
+        query.bindValue(":start", start.toUTC().toString("yyyy-MM-dd HH:mm:ss"));
     }
     if (end.isValid()) {
-        query.bindValue(":end", end.toString(Qt::ISODate));
+        query.bindValue(":end", end.toUTC().toString("yyyy-MM-dd HH:mm:ss"));
     }
 
     if (!query.exec()) {

@@ -6,6 +6,7 @@
 #include <QMessageBox>
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QTimeZone>
 #include <cipher_engine.h>
 #include <QDebug>
 
@@ -70,7 +71,7 @@ void ViewerMainWindow::loadDatabase() {
 
     while (query.next()) {
         qint64 id = query.value(0).toLongLong();
-        qint64 ts = query.value(1).toLongLong();
+        QString tsStr = query.value(1).toString();
         QString userId = query.value(2).toString();
         QByteArray usernameEnc = query.value(3).toByteArray();
         QByteArray messageEnc = query.value(4).toByteArray();
@@ -84,7 +85,10 @@ void ViewerMainWindow::loadDatabase() {
         QString username = resUser.isSuccess() ? QString::fromUtf8(resUser.data()) : "(復号エラー)";
         QString message = resMsg.isSuccess() ? QString::fromUtf8(resMsg.data()) : "(復号エラー)";
 
-        QString timeStr = QDateTime::fromMSecsSinceEpoch(ts).toString("yyyy/MM/dd HH:mm:ss");
+        QDate date = QDate::fromString(tsStr.left(10), "yyyy-MM-dd");
+        QTime time = QTime::fromString(tsStr.mid(11), "HH:mm:ss");
+        QDateTime dt(date, time, QTimeZone::utc());
+        QString timeStr = dt.toLocalTime().toString("yyyy/MM/dd HH:mm:ss");
 
         QList<QStandardItem*> row;
         QStandardItem* timeItem = new QStandardItem(timeStr);
