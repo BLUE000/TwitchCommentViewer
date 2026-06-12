@@ -228,8 +228,53 @@ TEST(ConfigManagerTest, SaveAndLoadConfiguration) {
     EXPECT_EQ(cfg2.getObsOverlayFile(), "test_overlay.html");
     EXPECT_EQ(cfg2.getTtsIgnoreUsers(), testIgnore);
 
+    // 新設定項目の動作検証
+    cfg.setActiveTtsEngine(2);
+    cfg.setVoicevoxVolume(75);
+    cfg.setVoicevoxSpeed(1.5);
+    cfg.setVoicevoxPitch(-0.05);
+    cfg.setBouyomiSpeed(120);
+    cfg.setBouyomiPitch(95);
+    cfg.saveConfig();
+
+    ConfigManager cfg3;
+    ASSERT_TRUE(cfg3.loadConfig());
+    EXPECT_EQ(cfg3.activeTtsEngine(), 2);
+    EXPECT_EQ(cfg3.voicevoxVolume(), 75);
+    EXPECT_DOUBLE_EQ(cfg3.voicevoxSpeed(), 1.5);
+    EXPECT_DOUBLE_EQ(cfg3.voicevoxPitch(), -0.05);
+    EXPECT_EQ(cfg3.bouyomiSpeed(), 120);
+    EXPECT_EQ(cfg3.bouyomiPitch(), 95);
+
     // テスト後のクリーンアップ
     QFile::remove(configPath);
+}
+
+#include "modules/VoiceVoxIntegrationImpl.h"
+
+TEST(VoiceVoxIntegrationTest, QueryJsonRewrite) {
+    ConfigManager cfg;
+    cfg.setVoicevoxVolume(80);
+    cfg.setVoicevoxSpeed(1.2);
+    cfg.setVoicevoxPitch(0.05);
+
+    VoiceVoxIntegrationImpl voicevox(&cfg);
+    QByteArray rawJson = R"({
+        "accent_phrases": [],
+        "speedScale": 1.0,
+        "pitchScale": 0.0,
+        "intonationScale": 1.0,
+        "volumeScale": 1.0
+    })";
+
+    QByteArray modifiedJson = voicevox.modifyQueryJson(rawJson);
+    QJsonDocument doc = QJsonDocument::fromJson(modifiedJson);
+    ASSERT_TRUE(doc.isObject());
+    QJsonObject obj = doc.object();
+
+    EXPECT_DOUBLE_EQ(obj["speedScale"].toDouble(), 1.2);
+    EXPECT_DOUBLE_EQ(obj["pitchScale"].toDouble(), 0.05);
+    EXPECT_DOUBLE_EQ(obj["volumeScale"].toDouble(), 0.8);
 }
 
 #include <QCoreApplication>

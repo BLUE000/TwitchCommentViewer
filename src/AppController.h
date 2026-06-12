@@ -5,7 +5,7 @@
 #include <QTimer>
 #include <memory>
 #include "interfaces/ITwitchEventCollector.h"
-#include "interfaces/IBouyomiIntegration.h"
+#include "interfaces/ITtsIntegration.h"
 #include "interfaces/ICommentAnalyzer.h"
 #include "interfaces/IObsIntegration.h"
 #include "modules/ObsWebSocketServer.h"
@@ -34,7 +34,7 @@ public slots:
     
     // UIからの要求を処理するスロット
     void startOAuthFlow();
-    void bouyomiTestRequested(const QString& message);
+    void ttsTestRequested(const QString& message);
     void onTabWidgetChanged(int index);
     void onChattersTimerTimeout();
     void triggerChattersFetch();
@@ -56,7 +56,7 @@ private:
     MainWindow* m_mainWindow = nullptr;
     std::unique_ptr<ConfigManager> m_configManager;
     std::unique_ptr<ITwitchEventCollector> m_twitchCollector;
-    std::unique_ptr<IBouyomiIntegration> m_bouyomiIntegration;
+    std::unique_ptr<ITtsIntegration> m_ttsIntegration;
     std::unique_ptr<IObsIntegration> m_obsFileIntegration;
     std::unique_ptr<ObsWebSocketServer> m_obsWsIntegration;
     std::unique_ptr<ObsHttpServer> m_obsHttpServer;

@@ -26,6 +26,8 @@ set(SOURCES
     modules/ConfigManager.h
     modules/BouyomiIntegrationImpl.cpp
     modules/BouyomiIntegrationImpl.h
+    modules/VoiceVoxIntegrationImpl.cpp
+    modules/VoiceVoxIntegrationImpl.h
     modules/ChatterRowWidget.cpp
     modules/ChatterRowWidget.h
 )
@@ -56,7 +58,7 @@ target_link_libraries(TwitchCommentManager PRIVATE
 )
 
 if(WIN32)
-    target_link_libraries(TwitchCommentManager PRIVATE crypt32)
+    target_link_libraries(TwitchCommentManager PRIVATE crypt32 winmm)
 endif()
 
 # 認証情報を読み込んでマクロに渡す

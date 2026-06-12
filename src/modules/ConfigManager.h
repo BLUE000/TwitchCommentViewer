@@ -20,6 +20,21 @@ public:
     QString getClientId() const { return m_clientId; }
     QString getAccessToken() const { return m_accessToken; }
 
+    // TTS共通設定の Getter/Setter
+    int activeTtsEngine() const { return m_activeTtsEngine; }
+    void setActiveTtsEngine(int engine) { m_activeTtsEngine = engine; }
+
+    bool getTtsAutoStart() const { return m_ttsAutoStart; }
+    void setTtsAutoStart(bool autoStart) { m_ttsAutoStart = autoStart; }
+    bool getTtsAutoStop() const { return m_ttsAutoStop; }
+    void setTtsAutoStop(bool autoStop) { m_ttsAutoStop = autoStop; }
+
+    // 互換性維持のためのGetter/Setter
+    bool getBouyomiAutoStart() const { return getTtsAutoStart(); }
+    void setBouyomiAutoStart(bool autoStart) { setTtsAutoStart(autoStart); }
+    bool getBouyomiAutoStop() const { return getTtsAutoStop(); }
+    void setBouyomiAutoStop(bool autoStop) { setTtsAutoStop(autoStop); }
+
     // 棒読みちゃん設定の Getter/Setter
     QString bouyomiHost() const { return m_bouyomiHost; }
     void setBouyomiHost(const QString& host) { m_bouyomiHost = host; }
@@ -35,11 +50,34 @@ public:
     
     int bouyomiVolume() const { return m_bouyomiVolume; }
     void setBouyomiVolume(int volume) { m_bouyomiVolume = volume; }
-    
-    bool getBouyomiAutoStart() const;
-    void setBouyomiAutoStart(bool autoStart);
-    bool getBouyomiAutoStop() const;
-    void setBouyomiAutoStop(bool autoStop);
+
+    int bouyomiSpeed() const { return m_bouyomiSpeed; }
+    void setBouyomiSpeed(int speed) { m_bouyomiSpeed = speed; }
+
+    int bouyomiPitch() const { return m_bouyomiPitch; }
+    void setBouyomiPitch(int pitch) { m_bouyomiPitch = pitch; }
+
+    // VOICEVOX設定の Getter/Setter
+    QString voicevoxHost() const { return m_voicevoxHost; }
+    void setVoicevoxHost(const QString& host) { m_voicevoxHost = host; }
+
+    int voicevoxPort() const { return m_voicevoxPort; }
+    void setVoicevoxPort(int port) { m_voicevoxPort = port; }
+
+    QString voicevoxExePath() const { return m_voicevoxExePath; }
+    void setVoicevoxExePath(const QString& path) { m_voicevoxExePath = path; }
+
+    int voicevoxSpeaker() const { return m_voicevoxSpeaker; }
+    void setVoicevoxSpeaker(int speaker) { m_voicevoxSpeaker = speaker; }
+
+    int voicevoxVolume() const { return m_voicevoxVolume; }
+    void setVoicevoxVolume(int volume) { m_voicevoxVolume = volume; }
+
+    double voicevoxSpeed() const { return m_voicevoxSpeed; }
+    void setVoicevoxSpeed(double speed) { m_voicevoxSpeed = speed; }
+
+    double voicevoxPitch() const { return m_voicevoxPitch; }
+    void setVoicevoxPitch(double pitch) { m_voicevoxPitch = pitch; }
 
     // OBS連携設定
     bool getObsFileOutputEnabled() const;
@@ -84,14 +122,28 @@ private:
     QString m_accessToken;
     QString m_cipherKey; // TransCipher用の鍵
 
+    // TTS共通設定
+    int m_activeTtsEngine = 1; // 0: None, 1: Bouyomi, 2: VOICEVOX
+    bool m_ttsAutoStart = false;
+    bool m_ttsAutoStop = false;
+
     // 棒読みちゃん設定
     QString m_bouyomiHost = "127.0.0.1";
     int m_bouyomiPort = 50001;
     QString m_bouyomiExePath = "";
     int m_bouyomiVoice = 0;
     int m_bouyomiVolume = -1;
-    bool m_bouyomiAutoStart = false;
-    bool m_bouyomiAutoStop = false;
+    int m_bouyomiSpeed = 100;
+    int m_bouyomiPitch = 100;
+
+    // VOICEVOX設定
+    QString m_voicevoxHost = "127.0.0.1";
+    int m_voicevoxPort = 50021;
+    QString m_voicevoxExePath = "";
+    int m_voicevoxSpeaker = 3;
+    int m_voicevoxVolume = 100;
+    double m_voicevoxSpeed = 1.0;
+    double m_voicevoxPitch = 0.0;
 
     bool m_obsFileOutputEnabled = false;
     bool m_obsWebSocketEnabled = false;

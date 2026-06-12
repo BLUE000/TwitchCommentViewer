@@ -1,6 +1,7 @@
 #include "AppController.h"
 #include "modules/TwitchEventCollectorImpl.h"
 #include "modules/BouyomiIntegrationImpl.h"
+#include "modules/VoiceVoxIntegrationImpl.h"
 #include "modules/ObsFileIntegrationImpl.h"
 #include "modules/ObsWebSocketServer.h"
 #include "modules/ObsHttpServer.h"
@@ -51,7 +52,7 @@ AppController::AppController(QObject* parent) : QObject(parent) {
     
     // 自身のインスタンスをイベントターゲットとして渡す
     m_twitchCollector = std::make_unique<TwitchEventCollectorImpl>(this);
-    m_bouyomiIntegration = std::make_unique<BouyomiIntegrationImpl>(m_configManager.get(), this);
+    m_ttsIntegration = nullptr;
     
     // OBS連携モジュールの初期化 (ポートは初期化時に設定)
     m_obsFileIntegration = std::make_unique<ObsFileIntegrationImpl>(this);
@@ -105,9 +106,18 @@ void AppController::initialize() {
     // 設定を読み込み（ロードの成否に関わらず、一部の値は読み込まれている可能性がある）
     bool configLoaded = m_configManager->loadConfig();
     
-    // 設定ロードの成否に関わらず、各連携モジュールの初期化とサーバー起動を試みる
-    if (m_bouyomiIntegration) {
-        m_bouyomiIntegration->initialize();
+    // activeTtsEngine に基づいて m_ttsIntegration を動的に生成する
+    int engine = m_configManager->activeTtsEngine();
+    if (engine == 1) {
+        m_ttsIntegration = std::make_unique<BouyomiIntegrationImpl>(m_configManager.get(), this);
+    } else if (engine == 2) {
+        m_ttsIntegration = std::make_unique<VoiceVoxIntegrationImpl>(m_configManager.get(), this);
+    } else {
+        m_ttsIntegration = nullptr;
+    }
+
+    if (m_ttsIntegration) {
+        m_ttsIntegration->initialize();
     }
 
     if (m_obsHttpServer) {
@@ -230,9 +240,9 @@ void AppController::customEvent(QEvent* event) {
                 }
             }
             
-            if (!ttsIgnored) {
+            if (!ttsIgnored && m_ttsIntegration) {
                 // 例: 「ユーザー名、メッセージ」の形式で読ませる
-                m_bouyomiIntegration->sendText(commentEvent->userName() + "、" + safeMessage);
+                m_ttsIntegration->sendText(commentEvent->userName() + "、" + safeMessage);
             }
             
             // OBS連携 (ONに設定されているもののみ実行)
@@ -521,9 +531,9 @@ void AppController::startOAuthFlow() {
     }
 }
 
-void AppController::bouyomiTestRequested(const QString& message) {
-    if (m_bouyomiIntegration) {
-        m_bouyomiIntegration->sendText(message);
+void AppController::ttsTestRequested(const QString& message) {
+    if (m_ttsIntegration) {
+        m_ttsIntegration->sendText(message);
     }
 }
 

@@ -111,125 +111,254 @@
               </property>
              </widget>
             </item>
-        <item><widget class="QPushButton" name="btnToggleBouyomi"><property name="text"><string>▼ 棒読みちゃん連携設定</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="styleSheet"><string>text-align: left; font-weight: bold; padding: 5px;</string></property></widget></item><item><widget class="QGroupBox" name="groupBoxBouyomi">
-          <layout class="QFormLayout" name="formLayout">
-           <item row="0" column="0">
-            <widget class="QLabel" name="labelHost">
-             <property name="text"><string>ホスト名:</string></property>
-            </widget>
-           </item>
-           <item row="0" column="1">
-            <widget class="QLineEdit" name="editBouyomiHost">
-             <property name="text"><string>127.0.0.1</string></property>
-            </widget>
-           </item>
-           <item row="1" column="0">
-            <widget class="QLabel" name="labelPort">
-             <property name="text"><string>ポート:</string></property>
-            </widget>
-           </item>
-           <item row="1" column="1">
-            <widget class="QSpinBox" name="spinBouyomiPort">
-             <property name="maximum"><number>65535</number></property>
-             <property name="value"><number>50001</number></property>
-            </widget>
-           </item>
-           <item row="2" column="0">
-            <widget class="QLabel" name="labelExe">
-             <property name="text"><string>実行ファイルパス:</string></property>
-            </widget>
-           </item>
-           <item row="2" column="1">
-            <layout class="QHBoxLayout" name="horizontalLayoutExe">
+        <item><widget class="QPushButton" name="btnToggleTts"><property name="text"><string>▼ 読み上げ設定</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="styleSheet"><string>text-align: left; font-weight: bold; padding: 5px;</string></property></widget></item><item><widget class="QGroupBox" name="groupBoxTts">
+          <layout class="QVBoxLayout" name="verticalLayoutTts">
+           <item>
+            <layout class="QHBoxLayout" name="horizontalLayoutEngineSelect">
              <item>
-              <widget class="QLineEdit" name="editBouyomiExe" />
+              <widget class="QRadioButton" name="radUseBouyomi">
+               <property name="text"><string>棒読みちゃんを使用する</string></property>
+               <property name="checked"><bool>true</bool></property>
+              </widget>
              </item>
              <item>
-              <widget class="QPushButton" name="btnBrowseBouyomi">
-               <property name="text"><string>参照...</string></property>
+              <widget class="QRadioButton" name="radUseVoicevox">
+               <property name="text"><string>VOICEVOXを使用する</string></property>
               </widget>
              </item>
             </layout>
            </item>
-           <item row="3" column="0">
-            <widget class="QLabel" name="labelVoice">
-             <property name="text"><string>ボイス設定:</string></property>
+           <item>
+            <widget class="QStackedWidget" name="stackedTtsEngines">
+             <widget class="QWidget" name="pageBouyomi">
+              <layout class="QFormLayout" name="formLayoutBouyomi">
+               <item row="0" column="0">
+                <widget class="QLabel" name="labelBouyomiHost">
+                 <property name="text"><string>ホスト名:</string></property>
+                </widget>
+               </item>
+               <item row="0" column="1">
+                <widget class="QLineEdit" name="editBouyomiHost">
+                 <property name="text"><string>127.0.0.1</string></property>
+                </widget>
+               </item>
+               <item row="1" column="0">
+                <widget class="QLabel" name="labelBouyomiPort">
+                 <property name="text"><string>ポート:</string></property>
+                </widget>
+               </item>
+               <item row="1" column="1">
+                <widget class="QSpinBox" name="spinBouyomiPort">
+                 <property name="maximum"><number>65535</number></property>
+                 <property name="value"><number>50001</number></property>
+                </widget>
+               </item>
+               <item row="2" column="0">
+                <widget class="QLabel" name="labelBouyomiExe">
+                 <property name="text"><string>実行ファイルパス:</string></property>
+                </widget>
+               </item>
+               <item row="2" column="1">
+                <layout class="QHBoxLayout" name="horizontalLayoutBouyomiExe">
+                 <item>
+                  <widget class="QLineEdit" name="editBouyomiExe"/>
+                 </item>
+                 <item>
+                  <widget class="QPushButton" name="btnBrowseBouyomi">
+                   <property name="text"><string>参照...</string></property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item row="3" column="0">
+                <widget class="QLabel" name="labelBouyomiVoice">
+                 <property name="text"><string>ボイス設定:</string></property>
+                </widget>
+               </item>
+               <item row="3" column="1">
+                <widget class="QComboBox" name="comboBouyomiVoice">
+                 <item><property name="text"><string>デフォルト (0)</string></property></item>
+                 <item><property name="text"><string>女性1 (1)</string></property></item>
+                 <item><property name="text"><string>女性2 (2)</string></property></item>
+                 <item><property name="text"><string>男性1 (3)</string></property></item>
+                 <item><property name="text"><string>男性2 (4)</string></property></item>
+                 <item><property name="text"><string>中性 (5)</string></property></item>
+                 <item><property name="text"><string>ロボット (6)</string></property></item>
+                 <item><property name="text"><string>機械1 (7)</string></property></item>
+                 <item><property name="text"><string>機械2 (8)</string></property></item>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+             <widget class="QWidget" name="pageVoicevox">
+              <layout class="QFormLayout" name="formLayoutVoicevox">
+               <item row="0" column="0">
+                <widget class="QLabel" name="labelVoicevoxHost">
+                 <property name="text"><string>ホスト名:</string></property>
+                </widget>
+               </item>
+               <item row="0" column="1">
+                <widget class="QLineEdit" name="editVoicevoxHost">
+                 <property name="text"><string>127.0.0.1</string></property>
+                </widget>
+               </item>
+               <item row="1" column="0">
+                <widget class="QLabel" name="labelVoicevoxPort">
+                 <property name="text"><string>ポート:</string></property>
+                </widget>
+               </item>
+               <item row="1" column="1">
+                <widget class="QSpinBox" name="spinVoicevoxPort">
+                 <property name="maximum"><number>65535</number></property>
+                 <property name="value"><number>50021</number></property>
+                </widget>
+               </item>
+               <item row="2" column="0">
+                <widget class="QLabel" name="labelVoicevoxExe">
+                 <property name="text"><string>実行ファイルパス:</string></property>
+                </widget>
+               </item>
+               <item row="2" column="1">
+                <layout class="QHBoxLayout" name="horizontalLayoutVoicevoxExe">
+                 <item>
+                  <widget class="QLineEdit" name="editVoicevoxExe"/>
+                 </item>
+                 <item>
+                  <widget class="QPushButton" name="btnBrowseVoicevox">
+                   <property name="text"><string>参照...</string></property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item row="3" column="0">
+                <widget class="QLabel" name="labelVoicevoxSpeaker">
+                 <property name="text"><string>話者ID:</string></property>
+                </widget>
+               </item>
+               <item row="3" column="1">
+                <widget class="QSpinBox" name="spinVoicevoxSpeaker">
+                 <property name="minimum"><number>0</number></property>
+                 <property name="maximum"><number>1000</number></property>
+                 <property name="value"><number>3</number></property>
+                </widget>
+               </item>
+              </layout>
+             </widget>
             </widget>
            </item>
-           <item row="3" column="1">
-            <widget class="QComboBox" name="comboBouyomiVoice">
-             <item><property name="text"><string>デフォルト (0)</string></property></item>
-             <item><property name="text"><string>女性1 (1)</string></property></item>
-             <item><property name="text"><string>女性2 (2)</string></property></item>
-             <item><property name="text"><string>男性1 (3)</string></property></item>
-             <item><property name="text"><string>男性2 (4)</string></property></item>
-             <item><property name="text"><string>中性 (5)</string></property></item>
-             <item><property name="text"><string>ロボット (6)</string></property></item>
-             <item><property name="text"><string>機械1 (7)</string></property></item>
-             <item><property name="text"><string>機械2 (8)</string></property></item>
+           <item>
+            <widget class="Line" name="lineSeparator">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
             </widget>
            </item>
-           <item row="4" column="0">
-            <widget class="QLabel" name="labelVolume">
-             <property name="text"><string>ボリューム:</string></property>
-            </widget>
-           </item>
-           <item row="4" column="1">
-            <widget class="QSpinBox" name="spinBouyomiVolume">
-             <property name="minimum"><number>-1</number></property>
-             <property name="maximum"><number>100</number></property>
-             <property name="value"><number>100</number></property>
-             <property name="specialValueText"><string>デフォルト</string></property>
-            </widget>
-           </item>
-           <item row="5" column="0">
-            <widget class="QLabel" name="labelAutoStart">
-             <property name="text"><string>連動起動:</string></property>
-            </widget>
-           </item>
-           <item row="5" column="1">
-            <widget class="QCheckBox" name="chkBouyomiAutoStart">
-             <property name="text"><string>起動時に棒読みちゃんを自動起動する</string></property>
-            </widget>
-           </item>
-           <item row="6" column="1">
-            <widget class="QCheckBox" name="chkBouyomiAutoStop">
-             <property name="text"><string>終了時に棒読みちゃんを自動終了する</string></property>
-            </widget>
-           </item>
-           <item row="7" column="0">
-            <widget class="QLabel" name="labelBouyomiIgnore">
-             <property name="text"><string>除外ユーザー (カンマ区切り):</string></property>
-            </widget>
-           </item>
-           <item row="7" column="1">
-            <widget class="QLineEdit" name="editBouyomiIgnoreUsers">
-             <property name="placeholderText"><string>Nightbot, Moobot, StreamElements</string></property>
-            </widget>
-           </item>
-           <item row="8" column="0">
-            <widget class="QLabel" name="labelTest">
-             <property name="text"><string>テスト送信:</string></property>
-            </widget>
-           </item>
-           <item row="8" column="1">
-            <layout class="QHBoxLayout" name="horizontalLayoutTest">
-             <item>
-              <widget class="QLineEdit" name="editBouyomiTestText">
-               <property name="placeholderText"><string>テスト用メッセージ</string></property>
+           <item>
+            <layout class="QFormLayout" name="formLayoutTtsCommon">
+             <item row="0" column="0">
+              <widget class="QLabel" name="labelTtsVolume">
+               <property name="text"><string>ボリューム:</string></property>
               </widget>
              </item>
-             <item>
-              <widget class="QPushButton" name="btnTestBouyomi">
-               <property name="text"><string>テスト送信</string></property>
+             <item row="0" column="1">
+              <widget class="QSpinBox" name="spinTtsVolume">
+               <property name="minimum"><number>-1</number></property>
+               <property name="maximum"><number>100</number></property>
+               <property name="value"><number>100</number></property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="labelTtsSpeed">
+               <property name="text"><string>速度（スピード）:</string></property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <layout class="QHBoxLayout" name="horizontalLayoutTtsSpeed">
+               <item>
+                <widget class="QDoubleSpinBox" name="doubleSpinTtsSpeed">
+                 <property name="minimum"><number>50</number></property>
+                 <property name="maximum"><number>300</number></property>
+                 <property name="value"><number>100</number></property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="labelTtsSpeedUnit">
+                 <property name="text"><string>%</string></property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="2" column="0">
+              <widget class="QLabel" name="labelTtsPitch">
+               <property name="text"><string>音程（ピッチ）:</string></property>
+              </widget>
+             </item>
+             <item row="2" column="1">
+              <layout class="QHBoxLayout" name="horizontalLayoutTtsPitch">
+               <item>
+                <widget class="QDoubleSpinBox" name="doubleSpinTtsPitch">
+                 <property name="minimum"><number>50</number></property>
+                 <property name="maximum"><number>200</number></property>
+                 <property name="value"><number>100</number></property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="labelTtsPitchUnit">
+                 <property name="text"><string>%</string></property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="3" column="0">
+              <widget class="QLabel" name="labelTtsAutoStart">
+               <property name="text"><string>連動起動:</string></property>
+              </widget>
+             </item>
+             <item row="3" column="1">
+              <widget class="QCheckBox" name="chkTtsAutoStart">
+               <property name="text"><string>起動時に読み上げツールを自動起動する</string></property>
+              </widget>
+             </item>
+             <item row="4" column="1">
+              <widget class="QCheckBox" name="chkTtsAutoStop">
+               <property name="text"><string>終了時に読み上げツールを自動終了する</string></property>
+              </widget>
+             </item>
+             <item row="5" column="0">
+              <widget class="QLabel" name="labelTtsIgnore">
+               <property name="text"><string>除外ユーザー (カンマ区切り):</string></property>
+              </widget>
+             </item>
+             <item row="5" column="1">
+              <widget class="QLineEdit" name="editTtsIgnoreUsers">
+               <property name="placeholderText"><string>Nightbot, Moobot, StreamElements</string></property>
+              </widget>
+             </item>
+             <item row="6" column="0">
+              <widget class="QLabel" name="labelTtsTest">
+               <property name="text"><string>テスト送信:</string></property>
+              </widget>
+             </item>
+             <item row="6" column="1">
+              <layout class="QHBoxLayout" name="horizontalLayoutTtsTest">
+               <item>
+                <widget class="QLineEdit" name="editTtsTestText">
+                 <property name="placeholderText"><string>テスト用メッセージ</string></property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QPushButton" name="btnTestTts">
+                 <property name="text"><string>テスト送信</string></property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="7" column="1">
+              <widget class="QPushButton" name="btnSaveTts">
+               <property name="text"><string>設定を保存</string></property>
               </widget>
              </item>
             </layout>
-           </item>
-           <item row="9" column="1">
-            <widget class="QPushButton" name="btnSaveBouyomi">
-             <property name="text"><string>設定を保存</string></property>
-            </widget>
            </item>
           </layout>
          </widget>

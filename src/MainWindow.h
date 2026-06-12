@@ -42,13 +42,16 @@ public:
 private slots:
     void on_btnStartAuth_clicked();
     void on_btnBrowseBouyomi_clicked();
-    void on_btnSaveBouyomi_clicked();
-    void on_btnTestBouyomi_clicked();
+    void on_btnBrowseVoicevox_clicked();
+    void on_btnSaveTts_clicked();
+    void on_btnTestTts_clicked();
+    void on_radUseBouyomi_toggled(bool checked);
+    void on_radUseVoicevox_toggled(bool checked);
     void on_btnSaveObs_clicked();
     void on_btnCopyObsUrl_clicked();
     void on_btnOpenOverlayFolder_clicked();
     
-    void on_btnToggleBouyomi_toggled(bool checked);
+    void on_btnToggleTts_toggled(bool checked);
     void on_btnToggleObs_toggled(bool checked);
     void on_btnToggleBot_toggled(bool checked);
     void on_btnToggleDb_toggled(bool checked);

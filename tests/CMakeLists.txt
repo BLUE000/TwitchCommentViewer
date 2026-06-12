@@ -15,6 +15,8 @@ add_executable(UnitTests
     test_main.cpp
     ${CMAKE_SOURCE_DIR}/src/modules/DatabaseManager.cpp
     ${CMAKE_SOURCE_DIR}/src/modules/ConfigManager.cpp
+    ${CMAKE_SOURCE_DIR}/src/modules/VoiceVoxIntegrationImpl.cpp
+    ${CMAKE_SOURCE_DIR}/src/modules/VoiceVoxIntegrationImpl.h
 )
 
 target_include_directories(UnitTests PRIVATE 
@@ -35,7 +37,7 @@ target_link_libraries(UnitTests PRIVATE
 )
 
 if(WIN32)
-    target_link_libraries(UnitTests PRIVATE crypt32)
+    target_link_libraries(UnitTests PRIVATE crypt32 winmm)
 endif()
 
 # テスト実行フォルダにもDLLをコピー

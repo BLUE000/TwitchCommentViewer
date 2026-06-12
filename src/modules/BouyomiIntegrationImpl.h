@@ -1,12 +1,12 @@
 #pragma once
-#include "../interfaces/IBouyomiIntegration.h"
+#include "../interfaces/ITtsIntegration.h"
 #include <QObject>
 #include <QTcpSocket>
 #include <QProcess>
 
 class ConfigManager;
 
-class BouyomiIntegrationImpl : public QObject, public IBouyomiIntegration {
+class BouyomiIntegrationImpl : public QObject, public ITtsIntegration {
     Q_OBJECT
 public:
     explicit BouyomiIntegrationImpl(ConfigManager* config, QObject* parent = nullptr);

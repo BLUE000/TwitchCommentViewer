@@ -92,7 +92,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_chartUpdateTimer->start();
 
     // Bouyomi & OBS default UI states
-    ui->groupBoxBouyomi->setVisible(true);
+    ui->groupBoxTts->setVisible(true);
     ui->tableUserStats->setEditTriggers(QAbstractItemView::NoEditTriggers);
     ui->tableUserStats->setSelectionBehavior(QAbstractItemView::SelectRows);
 
@@ -177,19 +177,73 @@ void MainWindow::setConfigManager(ConfigManager* configManager) {
     m_configManager = configManager;
     
     // UIを初期化
+    int engine = m_configManager->activeTtsEngine();
+    
+    // 先にシグナルが走って値が上書きされるのを防ぐため、一時的にシグナルをブロックする
+    ui->radUseBouyomi->blockSignals(true);
+    ui->radUseVoicevox->blockSignals(true);
+
+    if (engine == 2) {
+        ui->radUseVoicevox->setChecked(true);
+        ui->stackedTtsEngines->setCurrentIndex(1);
+    } else {
+        ui->radUseBouyomi->setChecked(true);
+        ui->stackedTtsEngines->setCurrentIndex(0);
+    }
+
+    ui->radUseBouyomi->blockSignals(false);
+    ui->radUseVoicevox->blockSignals(false);
+
+    // 棒読みちゃん個別設定
     ui->editBouyomiHost->setText(m_configManager->bouyomiHost());
     ui->spinBouyomiPort->setValue(m_configManager->bouyomiPort());
     ui->editBouyomiExe->setText(m_configManager->bouyomiExePath());
-    
     int voiceIdx = m_configManager->bouyomiVoice();
     if (voiceIdx >= 0 && voiceIdx < ui->comboBouyomiVoice->count()) {
         ui->comboBouyomiVoice->setCurrentIndex(voiceIdx);
     }
-    
-    ui->spinBouyomiVolume->setValue(m_configManager->bouyomiVolume());
-    ui->chkBouyomiAutoStart->setChecked(m_configManager->getBouyomiAutoStart());
-    ui->chkBouyomiAutoStop->setChecked(m_configManager->getBouyomiAutoStop());
-    ui->editBouyomiIgnoreUsers->setText(m_configManager->getTtsIgnoreUsers().join(", "));
+
+    // VOICEVOX個別設定
+    ui->editVoicevoxHost->setText(m_configManager->voicevoxHost());
+    ui->spinVoicevoxPort->setValue(m_configManager->voicevoxPort());
+    ui->editVoicevoxExe->setText(m_configManager->voicevoxExePath());
+    ui->spinVoicevoxSpeaker->setValue(m_configManager->voicevoxSpeaker());
+
+    // 共通コントロールに現在のアクティブエンジンの設定値を適用
+    if (engine == 2) {
+        ui->spinTtsVolume->setValue(m_configManager->voicevoxVolume());
+        
+        ui->doubleSpinTtsSpeed->setMinimum(0.5);
+        ui->doubleSpinTtsSpeed->setMaximum(2.0);
+        ui->doubleSpinTtsSpeed->setSingleStep(0.1);
+        ui->doubleSpinTtsSpeed->setValue(m_configManager->voicevoxSpeed());
+        ui->labelTtsSpeedUnit->setText("倍");
+
+        ui->doubleSpinTtsPitch->setMinimum(-0.15);
+        ui->doubleSpinTtsPitch->setMaximum(0.15);
+        ui->doubleSpinTtsPitch->setSingleStep(0.01);
+        ui->doubleSpinTtsPitch->setValue(m_configManager->voicevoxPitch());
+        ui->labelTtsPitchUnit->setText("");
+    } else {
+        ui->spinTtsVolume->setValue(m_configManager->bouyomiVolume());
+        
+        ui->doubleSpinTtsSpeed->setMinimum(50);
+        ui->doubleSpinTtsSpeed->setMaximum(300);
+        ui->doubleSpinTtsSpeed->setSingleStep(10);
+        ui->doubleSpinTtsSpeed->setValue(m_configManager->bouyomiSpeed());
+        ui->labelTtsSpeedUnit->setText("%");
+
+        ui->doubleSpinTtsPitch->setMinimum(50);
+        ui->doubleSpinTtsPitch->setMaximum(200);
+        ui->doubleSpinTtsPitch->setSingleStep(10);
+        ui->doubleSpinTtsPitch->setValue(m_configManager->bouyomiPitch());
+        ui->labelTtsPitchUnit->setText("%");
+    }
+
+    // 共通チェックボックス・除外ユーザーなど
+    ui->chkTtsAutoStart->setChecked(m_configManager->getTtsAutoStart());
+    ui->chkTtsAutoStop->setChecked(m_configManager->getTtsAutoStop());
+    ui->editTtsIgnoreUsers->setText(m_configManager->getTtsIgnoreUsers().join(", "));
 
     ui->chkObsFileOutput->setChecked(m_configManager->getObsFileOutputEnabled());
     ui->chkObsWebSocket->setChecked(m_configManager->getObsWebSocketEnabled());
@@ -214,19 +268,48 @@ void MainWindow::on_btnBrowseBouyomi_clicked() {
     }
 }
 
-void MainWindow::on_btnSaveBouyomi_clicked() {
+void MainWindow::on_btnBrowseVoicevox_clicked() {
+    QString filePath = QFileDialog::getOpenFileName(this, "VOICEVOXの実行ファイルを選択", "", "実行ファイル (*.exe);;すべてのファイル (*.*)");
+    if (!filePath.isEmpty()) {
+        ui->editVoicevoxExe->setText(filePath);
+    }
+}
+
+void MainWindow::on_btnSaveTts_clicked() {
     if (!m_configManager) return;
     
+    int engine = ui->radUseVoicevox->isChecked() ? 2 : 1;
+    m_configManager->setActiveTtsEngine(engine);
+
+    // 共通ボリューム・速度・音程の退避
+    if (engine == 2) {
+        m_configManager->setVoicevoxVolume(ui->spinTtsVolume->value());
+        m_configManager->setVoicevoxSpeed(ui->doubleSpinTtsSpeed->value());
+        m_configManager->setVoicevoxPitch(ui->doubleSpinTtsPitch->value());
+    } else {
+        m_configManager->setBouyomiVolume(ui->spinTtsVolume->value());
+        m_configManager->setBouyomiSpeed(static_cast<int>(ui->doubleSpinTtsSpeed->value()));
+        m_configManager->setBouyomiPitch(static_cast<int>(ui->doubleSpinTtsPitch->value()));
+    }
+
+    // 棒読みちゃん個別設定の保存
     m_configManager->setBouyomiHost(ui->editBouyomiHost->text());
     m_configManager->setBouyomiPort(ui->spinBouyomiPort->value());
     m_configManager->setBouyomiExePath(ui->editBouyomiExe->text());
     m_configManager->setBouyomiVoice(ui->comboBouyomiVoice->currentIndex());
-    m_configManager->setBouyomiVolume(ui->spinBouyomiVolume->value());
-    m_configManager->setBouyomiAutoStart(ui->chkBouyomiAutoStart->isChecked());
-    m_configManager->setBouyomiAutoStop(ui->chkBouyomiAutoStop->isChecked());
+
+    // VOICEVOX個別設定の保存
+    m_configManager->setVoicevoxHost(ui->editVoicevoxHost->text());
+    m_configManager->setVoicevoxPort(ui->spinVoicevoxPort->value());
+    m_configManager->setVoicevoxExePath(ui->editVoicevoxExe->text());
+    m_configManager->setVoicevoxSpeaker(ui->spinVoicevoxSpeaker->value());
+
+    // 共通自動起動・自動終了
+    m_configManager->setTtsAutoStart(ui->chkTtsAutoStart->isChecked());
+    m_configManager->setTtsAutoStop(ui->chkTtsAutoStop->isChecked());
     
     QStringList ignoreList;
-    QString rawText = ui->editBouyomiIgnoreUsers->text();
+    QString rawText = ui->editTtsIgnoreUsers->text();
     for (const QString& part : rawText.split(",")) {
         QString trimmed = part.trimmed();
         if (!trimmed.isEmpty()) {
@@ -236,16 +319,16 @@ void MainWindow::on_btnSaveBouyomi_clicked() {
     m_configManager->setTtsIgnoreUsers(ignoreList);
 
     m_configManager->saveConfig();
-    showStatusMessage("棒読みちゃんの設定を保存しました。", 3000);
+    showStatusMessage("読み上げ設定を保存しました。", 3000);
 }
 
-void MainWindow::on_btnTestBouyomi_clicked() {
-    QString testMessage = ui->editBouyomiTestText->text();
+void MainWindow::on_btnTestTts_clicked() {
+    QString testMessage = ui->editTtsTestText->text();
     if (testMessage.isEmpty()) {
         testMessage = "これはテストメッセージです";
     }
     if (m_controller) {
-        QMetaObject::invokeMethod(m_controller, "bouyomiTestRequested", Qt::QueuedConnection, Q_ARG(QString, testMessage));
+        QMetaObject::invokeMethod(m_controller, "ttsTestRequested", Qt::QueuedConnection, Q_ARG(QString, testMessage));
     }
 }
 
@@ -278,9 +361,67 @@ void MainWindow::on_btnCopyObsUrl_clicked() {
     clipboard->setText(ui->editObsUrl->text());
 }
 
-void MainWindow::on_btnToggleBouyomi_toggled(bool checked) {
-    ui->groupBoxBouyomi->setVisible(checked);
-    ui->btnToggleBouyomi->setText(checked ? "▼ 棒読みちゃん連携設定" : "▶ 棒読みちゃん連携設定");
+void MainWindow::on_btnToggleTts_toggled(bool checked) {
+    ui->groupBoxTts->setVisible(checked);
+    ui->btnToggleTts->setText(checked ? "▼ 読み上げ設定" : "▶ 読み上げ設定");
+}
+
+void MainWindow::on_radUseBouyomi_toggled(bool checked) {
+    if (!checked) return;
+    ui->stackedTtsEngines->setCurrentIndex(0);
+
+    // VOICEVOX側の設定をUIからConfigManagerに退避
+    if (m_configManager) {
+        m_configManager->setVoicevoxVolume(ui->spinTtsVolume->value());
+        m_configManager->setVoicevoxSpeed(ui->doubleSpinTtsSpeed->value());
+        m_configManager->setVoicevoxPitch(ui->doubleSpinTtsPitch->value());
+    }
+
+    // UIの表示範囲と値を棒読みちゃん用に切り替え
+    ui->doubleSpinTtsSpeed->setMinimum(50);
+    ui->doubleSpinTtsSpeed->setMaximum(300);
+    ui->doubleSpinTtsSpeed->setSingleStep(10);
+    ui->labelTtsSpeedUnit->setText("%");
+
+    ui->doubleSpinTtsPitch->setMinimum(50);
+    ui->doubleSpinTtsPitch->setMaximum(200);
+    ui->doubleSpinTtsPitch->setSingleStep(10);
+    ui->labelTtsPitchUnit->setText("%");
+
+    if (m_configManager) {
+        ui->spinTtsVolume->setValue(m_configManager->bouyomiVolume());
+        ui->doubleSpinTtsSpeed->setValue(m_configManager->bouyomiSpeed());
+        ui->doubleSpinTtsPitch->setValue(m_configManager->bouyomiPitch());
+    }
+}
+
+void MainWindow::on_radUseVoicevox_toggled(bool checked) {
+    if (!checked) return;
+    ui->stackedTtsEngines->setCurrentIndex(1);
+
+    // 棒読みちゃん側の設定をUIからConfigManagerに退避
+    if (m_configManager) {
+        m_configManager->setBouyomiVolume(ui->spinTtsVolume->value());
+        m_configManager->setBouyomiSpeed(static_cast<int>(ui->doubleSpinTtsSpeed->value()));
+        m_configManager->setBouyomiPitch(static_cast<int>(ui->doubleSpinTtsPitch->value()));
+    }
+
+    // UIの表示範囲と値をVOICEVOX用に切り替え
+    ui->doubleSpinTtsSpeed->setMinimum(0.5);
+    ui->doubleSpinTtsSpeed->setMaximum(2.0);
+    ui->doubleSpinTtsSpeed->setSingleStep(0.1);
+    ui->labelTtsSpeedUnit->setText("倍");
+
+    ui->doubleSpinTtsPitch->setMinimum(-0.15);
+    ui->doubleSpinTtsPitch->setMaximum(0.15);
+    ui->doubleSpinTtsPitch->setSingleStep(0.01);
+    ui->labelTtsPitchUnit->setText("");
+
+    if (m_configManager) {
+        ui->spinTtsVolume->setValue(m_configManager->voicevoxVolume());
+        ui->doubleSpinTtsSpeed->setValue(m_configManager->voicevoxSpeed());
+        ui->doubleSpinTtsPitch->setValue(m_configManager->voicevoxPitch());
+    }
 }
 
 void MainWindow::on_btnToggleObs_toggled(bool checked) {

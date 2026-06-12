@@ -25,9 +25,11 @@ void BouyomiIntegrationImpl::sendText(const QString& text) {
     QDataStream stream(&payload, QIODevice::WriteOnly);
     stream.setByteOrder(QDataStream::LittleEndian); // 棒読みちゃんはリトルエンディアン
 
+    int speed = m_config ? m_config->bouyomiSpeed() : -1;
+    int tone = m_config ? m_config->bouyomiPitch() : -1;
     stream << static_cast<qint16>(0x0001);  // Command: 1 (読み上げ)
-    stream << static_cast<qint16>(-1);      // Speed: -1 (デフォルト)
-    stream << static_cast<qint16>(-1);      // Tone: -1 (デフォルト)
+    stream << static_cast<qint16>(speed);   // Speed
+    stream << static_cast<qint16>(tone);    // Tone (Pitch)
     
     int volume = m_config ? m_config->bouyomiVolume() : -1;
     stream << static_cast<qint16>(volume);  // Volume
@@ -62,7 +64,7 @@ void BouyomiIntegrationImpl::sendText(const QString& text) {
 
 void BouyomiIntegrationImpl::checkAndStartProcess() {
     if (!m_config) return;
-    if (!m_config->getBouyomiAutoStart()) return;
+    if (!m_config->getTtsAutoStart()) return;
     
     QString exePath = m_config->bouyomiExePath();
     if (exePath.isEmpty()) return;
@@ -75,7 +77,7 @@ void BouyomiIntegrationImpl::checkAndStartProcess() {
 
 void BouyomiIntegrationImpl::stopProcess() {
     if (!m_config) return;
-    if (!m_config->getBouyomiAutoStop()) return;
+    if (!m_config->getTtsAutoStop()) return;
     
     if (m_process->state() != QProcess::NotRunning) {
         qInfo() << "Stopping Bouyomi-chan...";

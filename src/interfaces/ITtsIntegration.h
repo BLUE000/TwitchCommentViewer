@@ -1,13 +1,13 @@
 #pragma once
 #include <QString>
 
-class IBouyomiIntegration {
+class ITtsIntegration {
 public:
-    virtual ~IBouyomiIntegration() = default;
+    virtual ~ITtsIntegration() = default;
     
     // 初期化 (プロセス起動チェック等)
     virtual void initialize() = 0;
     
-    // 棒読みちゃん(TCP)等へのテキスト送信
+    // 音声読み上げエンジンへのテキスト送信
     virtual void sendText(const QString& text) = 0;
 };

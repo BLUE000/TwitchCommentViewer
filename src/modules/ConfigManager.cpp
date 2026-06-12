@@ -52,17 +52,47 @@ bool ConfigManager::loadConfig() {
     if (json.contains("twitch_redirect_uri")) m_redirectUri = json["twitch_redirect_uri"].toString();
     else if (json.contains("redirectUri")) m_redirectUri = json["redirectUri"].toString();
     
+    if (json.contains("activeTtsEngine")) m_activeTtsEngine = json["activeTtsEngine"].toInt(1);
+
     // 棒読みちゃん設定の読み込み
     QJsonObject bouyomiObj = json["bouyomi"].toObject();
-    if (bouyomiObj.contains("bouyomiHost")) m_bouyomiHost = bouyomiObj["bouyomiHost"].toString();
-    if (bouyomiObj.contains("bouyomiPort")) m_bouyomiPort = bouyomiObj["bouyomiPort"].toInt();
-    if (bouyomiObj.contains("bouyomiExePath")) m_bouyomiExePath = bouyomiObj["bouyomiExePath"].toString();
-    if (bouyomiObj.contains("bouyomiVoice")) m_bouyomiVoice = bouyomiObj["bouyomiVoice"].toInt();
-    if (bouyomiObj.contains("bouyomiVolume")) m_bouyomiVolume = bouyomiObj["bouyomiVolume"].toInt();
-    if (bouyomiObj.contains("auto_start")) m_bouyomiAutoStart = bouyomiObj["auto_start"].toBool();
-    else if (bouyomiObj.contains("bouyomiAutoStart")) m_bouyomiAutoStart = bouyomiObj["bouyomiAutoStart"].toBool();
-    if (bouyomiObj.contains("auto_stop")) {
-        m_bouyomiAutoStop = bouyomiObj["auto_stop"].toBool();
+    if (bouyomiObj.contains("bouyomiHost")) m_bouyomiHost = bouyomiObj["bouyomiHost"].toString("127.0.0.1");
+    if (bouyomiObj.contains("bouyomiPort")) m_bouyomiPort = bouyomiObj["bouyomiPort"].toInt(50001);
+    if (bouyomiObj.contains("bouyomiExePath")) m_bouyomiExePath = bouyomiObj["bouyomiExePath"].toString("");
+    if (bouyomiObj.contains("bouyomiVoice")) m_bouyomiVoice = bouyomiObj["bouyomiVoice"].toInt(0);
+    if (bouyomiObj.contains("bouyomiVolume")) m_bouyomiVolume = bouyomiObj["bouyomiVolume"].toInt(-1);
+    if (bouyomiObj.contains("bouyomiSpeed")) m_bouyomiSpeed = bouyomiObj["bouyomiSpeed"].toInt(100);
+    if (bouyomiObj.contains("bouyomiPitch")) m_bouyomiPitch = bouyomiObj["bouyomiPitch"].toInt(100);
+
+    // VOICEVOX設定の読み込み
+    QJsonObject voicevoxObj = json["voicevox"].toObject();
+    if (voicevoxObj.contains("voicevoxHost")) m_voicevoxHost = voicevoxObj["voicevoxHost"].toString("127.0.0.1");
+    if (voicevoxObj.contains("voicevoxPort")) m_voicevoxPort = voicevoxObj["voicevoxPort"].toInt(50021);
+    if (voicevoxObj.contains("voicevoxExePath")) m_voicevoxExePath = voicevoxObj["voicevoxExePath"].toString("");
+    if (voicevoxObj.contains("voicevoxSpeaker")) m_voicevoxSpeaker = voicevoxObj["voicevoxSpeaker"].toInt(3);
+    if (voicevoxObj.contains("voicevoxVolume")) m_voicevoxVolume = voicevoxObj["voicevoxVolume"].toInt(100);
+    if (voicevoxObj.contains("voicevoxSpeed")) m_voicevoxSpeed = voicevoxObj["voicevoxSpeed"].toDouble(1.0);
+    if (voicevoxObj.contains("voicevoxPitch")) m_voicevoxPitch = voicevoxObj["voicevoxPitch"].toDouble(0.0);
+
+    // 自動起動・自動終了設定の読み込み (共通キー・各エンジン内の個別キー両対応のフォールバック)
+    if (json.contains("ttsAutoStart")) {
+        m_ttsAutoStart = json["ttsAutoStart"].toBool();
+    } else if (bouyomiObj.contains("auto_start")) {
+        m_ttsAutoStart = bouyomiObj["auto_start"].toBool();
+    } else if (bouyomiObj.contains("bouyomiAutoStart")) {
+        m_ttsAutoStart = bouyomiObj["bouyomiAutoStart"].toBool();
+    } else {
+        m_ttsAutoStart = false;
+    }
+
+    if (json.contains("ttsAutoStop")) {
+        m_ttsAutoStop = json["ttsAutoStop"].toBool();
+    } else if (bouyomiObj.contains("auto_stop")) {
+        m_ttsAutoStop = bouyomiObj["auto_stop"].toBool();
+    } else if (bouyomiObj.contains("bouyomiAutoStop")) {
+        m_ttsAutoStop = bouyomiObj["bouyomiAutoStop"].toBool();
+    } else {
+        m_ttsAutoStop = false;
     }
     
     if (json.contains("obs_file_output")) {
@@ -126,15 +156,32 @@ void ConfigManager::saveConfig() {
     rootObj["twitch_client_id"] = m_clientId;
     rootObj["twitch_redirect_uri"] = m_redirectUri;
     
+    rootObj["activeTtsEngine"] = m_activeTtsEngine;
+    rootObj["ttsAutoStart"] = m_ttsAutoStart;
+    rootObj["ttsAutoStop"] = m_ttsAutoStop;
+    
     QJsonObject bouyomiObj;
     bouyomiObj["bouyomiHost"] = m_bouyomiHost;
     bouyomiObj["bouyomiPort"] = m_bouyomiPort;
     bouyomiObj["bouyomiExePath"] = m_bouyomiExePath;
     bouyomiObj["bouyomiVoice"] = m_bouyomiVoice;
     bouyomiObj["bouyomiVolume"] = m_bouyomiVolume;
-    bouyomiObj["auto_start"] = m_bouyomiAutoStart;
-    bouyomiObj["auto_stop"] = m_bouyomiAutoStop;
+    bouyomiObj["bouyomiSpeed"] = m_bouyomiSpeed;
+    bouyomiObj["bouyomiPitch"] = m_bouyomiPitch;
+    // 互換性維持のため、旧キー名でも格納しておく
+    bouyomiObj["auto_start"] = m_ttsAutoStart;
+    bouyomiObj["auto_stop"] = m_ttsAutoStop;
     rootObj["bouyomi"] = bouyomiObj;
+
+    QJsonObject voicevoxObj;
+    voicevoxObj["voicevoxHost"] = m_voicevoxHost;
+    voicevoxObj["voicevoxPort"] = m_voicevoxPort;
+    voicevoxObj["voicevoxExePath"] = m_voicevoxExePath;
+    voicevoxObj["voicevoxSpeaker"] = m_voicevoxSpeaker;
+    voicevoxObj["voicevoxVolume"] = m_voicevoxVolume;
+    voicevoxObj["voicevoxSpeed"] = m_voicevoxSpeed;
+    voicevoxObj["voicevoxPitch"] = m_voicevoxPitch;
+    rootObj["voicevox"] = voicevoxObj;
 
     rootObj["obs_file_output"] = m_obsFileOutputEnabled;
     rootObj["obs_websocket"] = m_obsWebSocketEnabled;
@@ -307,21 +354,7 @@ void ConfigManager::saveToken(const QString& token) {
 #endif
 }
 
-bool ConfigManager::getBouyomiAutoStart() const {
-    return m_bouyomiAutoStart;
-}
 
-void ConfigManager::setBouyomiAutoStart(bool autoStart) {
-    m_bouyomiAutoStart = autoStart;
-}
-
-bool ConfigManager::getBouyomiAutoStop() const {
-    return m_bouyomiAutoStop;
-}
-
-void ConfigManager::setBouyomiAutoStop(bool autoStop) {
-    m_bouyomiAutoStop = autoStop;
-}
 
 bool ConfigManager::getObsFileOutputEnabled() const {
     return m_obsFileOutputEnabled;
