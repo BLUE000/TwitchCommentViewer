@@ -57,6 +57,8 @@ private slots:
 
     void on_btnReadme_clicked();
     void on_btnAbout_clicked();
+    void on_btnSendAnnouncement_clicked();
+    void on_lineAnnouncementText_returnPressed();
 
 public slots:
     void appendAnalysisLog(const QString& logMsg);

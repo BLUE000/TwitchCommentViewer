@@ -20,4 +20,7 @@ public:
     virtual void setModeratorStatus(const QString& targetUserId, bool enable) = 0;
     virtual void banUser(const QString& targetUserId, int duration, const QString& reason = "") = 0;
     virtual void unbanUser(const QString& targetUserId) = 0;
+    virtual void pinChatMessage(const QString& messageId, int durationSeconds) = 0;
+    virtual void unpinChatMessage(const QString& messageId) = 0;
+    virtual void sendAnnouncement(const QString& message, const QString& color) = 0;
 };

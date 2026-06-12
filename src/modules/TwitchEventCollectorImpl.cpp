@@ -594,3 +594,36 @@ void TwitchEventCollectorImpl::unpinChatMessage(const QString& messageId) {
         nam->deleteLater();
     });
 }
+
+void TwitchEventCollectorImpl::sendAnnouncement(const QString& message, const QString& color) {
+    if (m_broadcasterId.isEmpty()) {
+        qWarning() << "Cannot send announcement: Broadcaster ID is empty.";
+        return;
+    }
+    
+    auto* nam = new QNetworkAccessManager(this);
+    QUrl url(QString("https://api.twitch.tv/helix/chat/announcements?broadcaster_id=%1&moderator_id=%2")
+             .arg(m_broadcasterId)
+             .arg(m_broadcasterId));
+             
+    QNetworkRequest request(url);
+    request.setRawHeader("Authorization", ("Bearer " + m_accessToken).toUtf8());
+    request.setRawHeader("Client-Id", m_clientId.toUtf8());
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+    QJsonObject body;
+    body["message"] = message;
+    body["color"] = color.isEmpty() ? "primary" : color;
+
+    QJsonDocument doc(body);
+    QNetworkReply* reply = nam->post(request, doc.toJson());
+    connect(reply, &QNetworkReply::finished, this, [reply, nam]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            qInfo() << "Successfully sent chat announcement!";
+        } else {
+            qWarning() << "Failed to send chat announcement:" << reply->errorString() << reply->readAll();
+        }
+        reply->deleteLater();
+        nam->deleteLater();
+    });
+}

@@ -21,8 +21,9 @@ public:
     void setModeratorStatus(const QString& targetUserId, bool enable) override;
     void banUser(const QString& targetUserId, int duration, const QString& reason = "") override;
     void unbanUser(const QString& targetUserId) override;
-    void pinChatMessage(const QString& messageId, int durationSeconds);
-    void unpinChatMessage(const QString& messageId);
+    void pinChatMessage(const QString& messageId, int durationSeconds) override;
+    void unpinChatMessage(const QString& messageId) override;
+    void sendAnnouncement(const QString& message, const QString& color) override;
 
     // 認証情報をセットする
     void setAuthData(const QString& clientId, const QString& accessToken);

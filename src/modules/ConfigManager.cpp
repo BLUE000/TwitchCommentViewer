@@ -185,7 +185,7 @@ void ConfigManager::startOAuthFlow() {
                               "?response_type=token"
                               "&client_id=%1"
                               "&redirect_uri=%2"
-                              "&scope=user:read:chat%20user:write:chat%20moderator:read:chatters%20moderator:manage:shoutouts%20channel:manage:vips%20channel:manage:moderators%20moderator:manage:banned_users%20moderator:manage:chat_messages")
+                              "&scope=user:read:chat%20user:write:chat%20moderator:read:chatters%20moderator:manage:shoutouts%20channel:manage:vips%20channel:manage:moderators%20moderator:manage:banned_users%20moderator:manage:chat_messages%20moderator:manage:announcements")
                           .arg(m_clientId)
                           .arg(m_redirectUri);
                           

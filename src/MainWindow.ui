@@ -28,6 +28,56 @@
         <item>
          <widget class="QTableView" name="tableViewComments" />
         </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayoutAnnouncement">
+          <item>
+           <widget class="QComboBox" name="comboAnnouncementColor">
+            <item>
+             <property name="text">
+              <string>通常</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>青</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>緑</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>オレンジ</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>紫</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="lineAnnouncementText">
+            <property name="placeholderText">
+             <string>アナウンスメッセージを入力...</string>
+            </property>
+            <property name="maxLength">
+             <number>500</number>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="btnSendAnnouncement">
+            <property name="text">
+             <string>アナウンス送信</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
        </layout>
       </widget>
       <widget class="QWidget" name="tabChatters">

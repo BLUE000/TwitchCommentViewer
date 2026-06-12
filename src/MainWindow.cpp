@@ -1101,3 +1101,29 @@ void MainWindow::resizeEvent(QResizeEvent* event) {
     m_chartNeedsUpdate = true;
     updateChartDisplay();
 }
+
+void MainWindow::on_btnSendAnnouncement_clicked() {
+    QString text = ui->lineAnnouncementText->text().trimmed();
+    if (text.isEmpty()) return;
+
+    // Map UI color names to Twitch Helix Announcement API colors
+    // Combo indices: 0:通常 (primary), 1:青 (blue), 2:緑 (green), 3:オレンジ (orange), 4:紫 (purple)
+    QString color = "primary";
+    int index = ui->comboAnnouncementColor->currentIndex();
+    if (index == 1) color = "blue";
+    else if (index == 2) color = "green";
+    else if (index == 3) color = "orange";
+    else if (index == 4) color = "purple";
+
+    if (m_controller) {
+        QMetaObject::invokeMethod(m_controller, "onSendAnnouncementRequested",
+                                  Qt::QueuedConnection,
+                                  Q_ARG(QString, text),
+                                  Q_ARG(QString, color));
+        ui->lineAnnouncementText->clear();
+    }
+}
+
+void MainWindow::on_lineAnnouncementText_returnPressed() {
+    on_btnSendAnnouncement_clicked();
+}

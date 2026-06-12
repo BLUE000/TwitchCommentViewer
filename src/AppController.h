@@ -46,6 +46,7 @@ public slots:
     void onChatterBanToggled(const QString& targetUserId, bool enable);
     void onPinCommentRequested(const QString& messageId, int durationSeconds);
     void onUnpinCommentRequested(const QString& messageId);
+    void onSendAnnouncementRequested(const QString& message, const QString& color);
 
 protected:
     // シグナルの代わりにEvent割り込みで処理を受け取る

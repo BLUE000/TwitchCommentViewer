@@ -528,15 +528,19 @@ void AppController::bouyomiTestRequested(const QString& message) {
 }
 
 void AppController::onPinCommentRequested(const QString& messageId, int durationSeconds) {
-    auto* impl = dynamic_cast<TwitchEventCollectorImpl*>(m_twitchCollector.get());
-    if (impl) {
-        impl->pinChatMessage(messageId, durationSeconds);
+    if (m_twitchCollector) {
+        m_twitchCollector->pinChatMessage(messageId, durationSeconds);
     }
 }
 
 void AppController::onUnpinCommentRequested(const QString& messageId) {
-    auto* impl = dynamic_cast<TwitchEventCollectorImpl*>(m_twitchCollector.get());
-    if (impl) {
-        impl->unpinChatMessage(messageId);
+    if (m_twitchCollector) {
+        m_twitchCollector->unpinChatMessage(messageId);
+    }
+}
+
+void AppController::onSendAnnouncementRequested(const QString& message, const QString& color) {
+    if (m_twitchCollector) {
+        m_twitchCollector->sendAnnouncement(message, color);
     }
 }
