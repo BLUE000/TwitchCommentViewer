@@ -30,6 +30,11 @@
         </item>
        </layout>
       </widget>
+      <widget class="QWidget" name="tabChatters">
+       <attribute name="title">
+        <string>視聴者</string>
+       </attribute>
+      </widget>
       <widget class="QWidget" name="tabAnalysis">
        <attribute name="title">
         <string>解析</string>
@@ -143,11 +148,21 @@
             </widget>
            </item>
            <item row="7" column="0">
+            <widget class="QLabel" name="labelBouyomiIgnore">
+             <property name="text"><string>除外ユーザー (カンマ区切り):</string></property>
+            </widget>
+           </item>
+           <item row="7" column="1">
+            <widget class="QLineEdit" name="editBouyomiIgnoreUsers">
+             <property name="placeholderText"><string>Nightbot, Moobot, StreamElements</string></property>
+            </widget>
+           </item>
+           <item row="8" column="0">
             <widget class="QLabel" name="labelTest">
              <property name="text"><string>テスト送信:</string></property>
             </widget>
            </item>
-           <item row="7" column="1">
+           <item row="8" column="1">
             <layout class="QHBoxLayout" name="horizontalLayoutTest">
              <item>
               <widget class="QLineEdit" name="editBouyomiTestText">
@@ -161,7 +176,7 @@
              </item>
             </layout>
            </item>
-           <item row="8" column="1">
+           <item row="9" column="1">
             <widget class="QPushButton" name="btnSaveBouyomi">
              <property name="text"><string>設定を保存</string></property>
             </widget>

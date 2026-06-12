@@ -3,6 +3,7 @@
 #include <QString>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QSet>
 
 class ConfigManager : public QObject {
     Q_OBJECT
@@ -56,6 +57,15 @@ public:
     QStringList getBotUsers() const;
     void setBotUsers(const QStringList& bots);
 
+    // 読み上げ除外ユーザー設定
+    QStringList getTtsIgnoreUsers() const;
+    void setTtsIgnoreUsers(const QStringList& users);
+
+    // アーティストユーザー設定
+    bool isArtist(const QString& userId) const;
+    void addArtist(const QString& userId);
+    void removeArtist(const QString& userId);
+
     // 認証情報
     void saveConfig(); // 設定保存用メソッド
 
@@ -89,6 +99,8 @@ private:
     QString m_obsOverlayFile = "overlay.html";
 
     QStringList m_botUsers;
+    QStringList m_ttsIgnoreUsers;
+    QSet<QString> m_artistUserIds;
 
     QTcpServer* m_httpServer;
 

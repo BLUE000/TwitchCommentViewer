@@ -1,6 +1,9 @@
 #include "MainWindow.h"
 #include "ui_MainWindow.h"
 #include "modules/ConfigManager.h"
+#include <QMenu>
+#include <QAction>
+#include <QResizeEvent>
 
 #include "modules/DatabaseManager.h"
 #include <QtCharts/QChartView>
@@ -35,13 +38,16 @@ MainWindow::MainWindow(QWidget *parent)
     // ビューワタブの名称をコメントに変更
     ui->tabWidget->setTabText(0, "コメント");
 
-    // 視聴者タブの追加
-    m_tabChatters = new QWidget(this);
-    ui->tabWidget->insertTab(1, m_tabChatters, "視聴者");
+    // 視聴者タブのセットアップ
+    m_tabChatters = ui->tabChatters;
     setupChattersTab();
 
-    // タブ変更シグナルの接続
-    connect(ui->tabWidget, &QTabWidget::currentChanged, this, &MainWindow::tabChanged);
+    // タブ変更イベントを非同期でコントローラへ通知
+    connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
+        if (m_controller) {
+            QMetaObject::invokeMethod(m_controller, "onTabWidgetChanged", Qt::QueuedConnection, Q_ARG(int, index));
+        }
+    });
 
     // QTabWidgetの右上にボタンを追加
     QWidget* cornerWidget = new QWidget(this);
@@ -98,6 +104,8 @@ MainWindow::MainWindow(QWidget *parent)
     ui->tableViewComments->horizontalHeader()->setStretchLastSection(true);
     ui->tableViewComments->setEditTriggers(QAbstractItemView::NoEditTriggers);
     ui->tableViewComments->setSelectionBehavior(QAbstractItemView::SelectRows);
+    ui->tableViewComments->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(ui->tableViewComments, &QTableView::customContextMenuRequested, this, &MainWindow::showCommentContextMenu);
 
     // ConfigManager が AppController から渡されるまでは空なので後で初期化される
 }
@@ -107,7 +115,7 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-void MainWindow::addCommentToView(const QString& userId, const QString& username, const QString& message, const QIcon& icon, const QStringList& badges) {
+void MainWindow::addCommentToView(const QString& userId, const QString& username, const QString& message, const QIcon& icon, const QStringList& badges, const QString& messageId) {
     auto getBadgeEmoji = [](const QString& badge) -> QString {
         if (badge == "broadcaster") return "👑";
         if (badge == "moderator") return "🛡️";
@@ -136,6 +144,7 @@ void MainWindow::addCommentToView(const QString& userId, const QString& username
     userItem->setData(userId, Qt::UserRole);
 
     auto* msgItem = new QStandardItem(message);
+    msgItem->setData(messageId, Qt::UserRole + 1);
 
     m_chatModel->appendRow({userItem, msgItem});
     
@@ -154,8 +163,14 @@ void MainWindow::updateAvatarIcon(const QString& userId, const QIcon& icon) {
     }
 }
 
+void MainWindow::setController(QObject* controller) {
+    m_controller = controller;
+}
+
 void MainWindow::on_btnStartAuth_clicked() {
-    emit authRequested();
+    if (m_controller) {
+        QMetaObject::invokeMethod(m_controller, "startOAuthFlow", Qt::QueuedConnection);
+    }
 }
 
 void MainWindow::setConfigManager(ConfigManager* configManager) {
@@ -174,6 +189,7 @@ void MainWindow::setConfigManager(ConfigManager* configManager) {
     ui->spinBouyomiVolume->setValue(m_configManager->bouyomiVolume());
     ui->chkBouyomiAutoStart->setChecked(m_configManager->getBouyomiAutoStart());
     ui->chkBouyomiAutoStop->setChecked(m_configManager->getBouyomiAutoStop());
+    ui->editBouyomiIgnoreUsers->setText(m_configManager->getTtsIgnoreUsers().join(", "));
 
     ui->chkObsFileOutput->setChecked(m_configManager->getObsFileOutputEnabled());
     ui->chkObsWebSocket->setChecked(m_configManager->getObsWebSocketEnabled());
@@ -209,8 +225,18 @@ void MainWindow::on_btnSaveBouyomi_clicked() {
     m_configManager->setBouyomiAutoStart(ui->chkBouyomiAutoStart->isChecked());
     m_configManager->setBouyomiAutoStop(ui->chkBouyomiAutoStop->isChecked());
     
+    QStringList ignoreList;
+    QString rawText = ui->editBouyomiIgnoreUsers->text();
+    for (const QString& part : rawText.split(",")) {
+        QString trimmed = part.trimmed();
+        if (!trimmed.isEmpty()) {
+            ignoreList.append(trimmed);
+        }
+    }
+    m_configManager->setTtsIgnoreUsers(ignoreList);
+
     m_configManager->saveConfig();
-    QMessageBox::information(this, "設定保存", "棒読みちゃんの設定を保存しました。");
+    showStatusMessage("棒読みちゃんの設定を保存しました。", 3000);
 }
 
 void MainWindow::on_btnTestBouyomi_clicked() {
@@ -218,7 +244,9 @@ void MainWindow::on_btnTestBouyomi_clicked() {
     if (testMessage.isEmpty()) {
         testMessage = "これはテストメッセージです";
     }
-    emit bouyomiTestRequested(testMessage);
+    if (m_controller) {
+        QMetaObject::invokeMethod(m_controller, "bouyomiTestRequested", Qt::QueuedConnection, Q_ARG(QString, testMessage));
+    }
 }
 
 void MainWindow::appendAnalysisLog(const QString& logMsg) {
@@ -241,6 +269,7 @@ void MainWindow::on_btnSaveObs_clicked() {
         
         QString url = QString("http://localhost:%1/").arg(ui->spinObsPort->value());
         ui->editObsUrl->setText(url);
+        showStatusMessage("OBS連携の設定を保存しました。", 3000);
     }
 }
 
@@ -285,8 +314,10 @@ void MainWindow::on_btnSaveBot_clicked() {
         }
         m_configManager->setBotUsers(botList);
         m_configManager->saveConfig();
-        emit botSettingsChanged(botList);
-        QMessageBox::information(this, "設定保存", "解析・集計設定を保存しました。");
+        if (m_controller) {
+            QMetaObject::invokeMethod(m_controller, "updateBotUsers", Qt::QueuedConnection, Q_ARG(QStringList, botList));
+        }
+        showStatusMessage("解析・集計設定を保存しました。", 3000);
     }
 }
 
@@ -376,11 +407,19 @@ void MainWindow::setupChart() {
     m_axisX = new QDateTimeAxis();
     m_axisX->setFormat("HH:mm:ss");
     m_axisX->setTitleText("時間");
+    m_axisX->setTickCount(5); // 横軸の目盛り数を5にして重複・省略を防ぐ
+    
+    QFont labelFont = m_axisX->labelsFont();
+    labelFont.setPointSize(8); // フォントサイズを少し小さくして表示スペースを確保
+    m_axisX->setLabelsFont(labelFont);
+    
     m_chart->addAxis(m_axisX, Qt::AlignBottom);
     
     m_axisY = new QValueAxis();
     m_axisY->setLabelFormat("%d");
     m_axisY->setTitleText("コメント数");
+    m_axisY->setLabelsFont(labelFont);
+    
     m_chart->addAxis(m_axisY, Qt::AlignLeft);
     
     ui->chartView->setChart(m_chart);
@@ -465,6 +504,47 @@ void MainWindow::updateChartDisplay() {
     else if (granIdx == 3) binSizeMs = 30000;
     else if (granIdx == 4) binSizeMs = 60000;
     else if (granIdx == 5) binSizeMs = 300000;
+
+    // 横軸（X軸）の時間間隔をキリのいい数字に揃える処理
+    QList<qint64> niceStepsX = {
+        5000LL,       // 5s
+        10000LL,      // 10s
+        30000LL,      // 30s
+        60000LL,      // 1m
+        120000LL,     // 2m
+        300000LL,     // 5m
+        600000LL,     // 10m
+        900000LL,     // 15m
+        1800000LL,    // 30m
+        3600000LL,    // 1h
+        7200000LL,    // 2h
+        10800000LL,   // 3h
+        21600000LL,   // 6h
+        43200000LL,   // 12h
+        86400000LL    // 24h
+    };
+    int chartWidth = ui->chartView->width();
+    qint64 targetDivisionsX = qMax(2LL, static_cast<qint64>(chartWidth / 150));
+    qint64 targetIntervalX = durationMs / targetDivisionsX;
+    qint64 niceIntervalX = 5000LL;
+    for (qint64 step : niceStepsX) {
+        if (step >= targetIntervalX) {
+            niceIntervalX = step;
+            break;
+        }
+    }
+    // 間隔は最低でもビンサイズ以上にする
+    if (niceIntervalX < binSizeMs) {
+        niceIntervalX = binSizeMs;
+    }
+
+    qint64 firstTimeRounded = (firstTime / niceIntervalX) * niceIntervalX;
+    qint64 lastTimeWithBin = lastTime + binSizeMs;
+    qint64 lastTimeRounded = ((lastTimeWithBin + niceIntervalX - 1) / niceIntervalX) * niceIntervalX;
+    if (lastTimeRounded <= firstTimeRounded) {
+        lastTimeRounded = firstTimeRounded + niceIntervalX;
+    }
+    qint64 tickCountX = ((lastTimeRounded - firstTimeRounded) / niceIntervalX) + 1;
     
     int typeIdx = ui->comboGraphType->currentIndex();
     int topNIdx = ui->comboTopN->currentIndex();
@@ -500,14 +580,14 @@ void MainWindow::updateChartDisplay() {
         }
     }
     
-    // データをビンに集計
+    // データをビンに集計（1970年からの絶対時間で基準化）
     QMap<QString, QMap<qint64, int>> binnedData; // user -> (binTime -> count)
     // "TOTAL" key for total graph
     qint64 maxCount = 0;
     
     for (const auto& entry : m_commentHistory) {
         qint64 t = entry.time.toMSecsSinceEpoch();
-        qint64 binTime = ((t - firstTime) / binSizeMs) * binSizeMs + firstTime;
+        qint64 binTime = (t / binSizeMs) * binSizeMs;
         
         if (typeIdx == 0) {
             binnedData["TOTAL"][binTime]++;
@@ -525,7 +605,7 @@ void MainWindow::updateChartDisplay() {
         
         auto bins = it.value();
         // 最初の時間から最後の時間まで0埋めしつつプロット
-        for (qint64 t = firstTime; t <= lastTime + binSizeMs; t += binSizeMs) {
+        for (qint64 t = firstTimeRounded; t <= lastTimeRounded; t += binSizeMs) {
             int count = bins.value(t, 0);
             series->append(t, count);
             if (count > maxCount) maxCount = count;
@@ -536,9 +616,43 @@ void MainWindow::updateChartDisplay() {
     }
     
     qDebug() << "setting axis ranges";
-    m_axisX->setRange(QDateTime::fromMSecsSinceEpoch(firstTime), QDateTime::fromMSecsSinceEpoch(lastTime + binSizeMs));
-    m_axisY->setRange(0, maxCount + 1);
-    m_axisY->setTickCount(qMin(10LL, maxCount + 2));
+    m_axisX->setRange(QDateTime::fromMSecsSinceEpoch(firstTimeRounded), QDateTime::fromMSecsSinceEpoch(lastTimeRounded));
+    m_axisX->setTickCount(static_cast<int>(tickCountX));
+
+    // 縦軸（Y軸）の目盛りを綺麗な整数刻み（1, 2, 5, 10, 25, 50...）にする丸め処理
+    qint64 niceStep = 1;
+    int chartHeight = ui->chartView->height();
+    qint64 targetDivisionsY = qMax(2LL, static_cast<qint64>(chartHeight / 50));
+    qint64 targetStep = (maxCount > 0) ? (maxCount + targetDivisionsY - 1) / targetDivisionsY : 1;
+
+    if (targetStep <= 1) niceStep = 1;
+    else if (targetStep <= 2) niceStep = 2;
+    else if (targetStep <= 5) niceStep = 5;
+    else if (targetStep <= 10) niceStep = 10;
+    else if (targetStep <= 20) niceStep = 20;
+    else if (targetStep <= 25) niceStep = 25;
+    else if (targetStep <= 50) niceStep = 50;
+    else if (targetStep <= 100) niceStep = 100;
+    else if (targetStep <= 200) niceStep = 200;
+    else if (targetStep <= 250) niceStep = 250;
+    else if (targetStep <= 500) niceStep = 500;
+    else {
+        qint64 factor = 1000;
+        while (true) {
+            if (targetStep <= factor) { niceStep = factor; break; }
+            if (targetStep <= factor * 2) { niceStep = factor * 2; break; }
+            if (targetStep <= factor * 2.5) { niceStep = factor * 25 / 10; break; }
+            if (targetStep <= factor * 5) { niceStep = factor * 5; break; }
+            factor *= 10;
+        }
+    }
+
+    qint64 maxRangeValue = ((maxCount + niceStep - 1) / niceStep) * niceStep;
+    if (maxRangeValue == 0) maxRangeValue = niceStep;
+    qint64 tickCount = (maxRangeValue / niceStep) + 1;
+
+    m_axisY->setRange(0, maxRangeValue);
+    m_axisY->setTickCount(static_cast<int>(tickCount));
     qDebug() << "updateChartDisplay finish";
 }
 
@@ -593,6 +707,7 @@ void MainWindow::setupChattersTab() {
     createAccordion(m_btnToggleBroadcaster, m_listBroadcaster, "ストリーマー");
     createAccordion(m_btnToggleModerator, m_listModerator, "モデレーター");
     createAccordion(m_btnToggleVip, m_listVip, "VIP");
+    createAccordion(m_btnToggleArtist, m_listArtist, "アーティスト");
     createAccordion(m_btnToggleBot, m_listBot, "チャットボット");
     createAccordion(m_btnToggleRegular, m_listRegular, "一般");
 
@@ -600,8 +715,12 @@ void MainWindow::setupChattersTab() {
     scrollArea->setWidget(scrollWidget);
     mainLayout->addWidget(scrollArea);
 
-    // 更新ボタンのシグナル接続
-    connect(m_btnUpdateChatters, &QPushButton::clicked, this, &MainWindow::chatterRefreshRequested);
+    // 更新ボタンのシグナル接続を非同期でコントローラ呼び出しへ変更
+    connect(m_btnUpdateChatters, &QPushButton::clicked, this, [this]() {
+        if (m_controller) {
+            QMetaObject::invokeMethod(m_controller, "triggerChattersFetch", Qt::QueuedConnection);
+        }
+    });
 
     m_originalWindowTitle = windowTitle();
     m_shoutoutCooldownTimer = new QTimer(this);
@@ -622,6 +741,7 @@ void MainWindow::updateChattersList(const QList<TwitchEvents::ChatterInfo>& chat
     m_listBroadcaster->clear();
     m_listModerator->clear();
     m_listVip->clear();
+    m_listArtist->clear();
     m_listBot->clear();
     m_listRegular->clear();
 
@@ -641,34 +761,46 @@ void MainWindow::updateChattersList(const QList<TwitchEvents::ChatterInfo>& chat
 
     for (const auto& chatter : chatters) {
         QString name = chatter.userName;
-        QString role = chatter.userBadge;
+        const QStringList& badges = chatter.userBadges;
 
-        QListWidget* targetList = m_listRegular;
+        QList<QListWidget*> targetLists;
         if (lowerBots.contains(name.toLower())) {
-            targetList = m_listBot;
-        } else if (role == "broadcaster") {
-            targetList = m_listBroadcaster;
-        } else if (role == "moderator") {
-            targetList = m_listModerator;
-        } else if (role == "vip") {
-            targetList = m_listVip;
+            targetLists.append(m_listBot);
+        }
+        if (badges.contains("broadcaster")) {
+            targetLists.append(m_listBroadcaster);
+        }
+        if (badges.contains("moderator")) {
+            targetLists.append(m_listModerator);
+        }
+        if (badges.contains("vip")) {
+            targetLists.append(m_listVip);
+        }
+        if (badges.contains("artist")) {
+            targetLists.append(m_listArtist);
+        }
+
+        if (targetLists.isEmpty()) {
+            targetLists.append(m_listRegular);
         }
 
         // すべてリストに追加
         QListWidgetItem* itemAll = new QListWidgetItem(m_listAll);
         itemAll->setSizeHint(QSize(0, 38));
-        ChatterRowWidget* widgetAll = new ChatterRowWidget(chatter.userId, chatter.userName, chatter.userBadge, m_listAll);
+        ChatterRowWidget* widgetAll = new ChatterRowWidget(chatter.userId, chatter.userName, chatter.userBadges, m_listAll);
         widgetAll->setShoutoutButtonEnabled(m_shoutoutCooldownRemaining <= 0);
         m_listAll->setItemWidget(itemAll, widgetAll);
         connectWidget(widgetAll);
         
         // 対象のカテゴリリストに追加
-        QListWidgetItem* itemTarget = new QListWidgetItem(targetList);
-        itemTarget->setSizeHint(QSize(0, 38));
-        ChatterRowWidget* widgetTarget = new ChatterRowWidget(chatter.userId, chatter.userName, chatter.userBadge, targetList);
-        widgetTarget->setShoutoutButtonEnabled(m_shoutoutCooldownRemaining <= 0);
-        targetList->setItemWidget(itemTarget, widgetTarget);
-        connectWidget(widgetTarget);
+        for (QListWidget* targetList : targetLists) {
+            QListWidgetItem* itemTarget = new QListWidgetItem(targetList);
+            itemTarget->setSizeHint(QSize(0, 38));
+            ChatterRowWidget* widgetTarget = new ChatterRowWidget(chatter.userId, chatter.userName, chatter.userBadges, targetList);
+            widgetTarget->setShoutoutButtonEnabled(m_shoutoutCooldownRemaining <= 0);
+            targetList->setItemWidget(itemTarget, widgetTarget);
+            connectWidget(widgetTarget);
+        }
     }
 
     // 各アコーディオンボタンのテキスト更新
@@ -683,6 +815,7 @@ void MainWindow::updateChattersList(const QList<TwitchEvents::ChatterInfo>& chat
     updateBtnText(m_btnToggleBroadcaster, m_listBroadcaster, "ストリーマー");
     updateBtnText(m_btnToggleModerator, m_listModerator, "モデレーター");
     updateBtnText(m_btnToggleVip, m_listVip, "VIP");
+    updateBtnText(m_btnToggleArtist, m_listArtist, "アーティスト");
     updateBtnText(m_btnToggleBot, m_listBot, "チャットボット");
     updateBtnText(m_btnToggleRegular, m_listRegular, "一般");
 
@@ -693,7 +826,9 @@ void MainWindow::onChatterShoutoutClicked(const QString& userId, const QString& 
     Q_UNUSED(userName);
     if (m_shoutoutCooldownRemaining > 0) return;
 
-    emit chatterShoutoutRequested(userId);
+    if (m_controller) {
+        QMetaObject::invokeMethod(m_controller, "onChatterShoutoutRequested", Qt::QueuedConnection, Q_ARG(QString, userId));
+    }
 
     m_shoutoutCooldownRemaining = 120; // 2分間
     updateShoutoutButtonsEnabled(false);
@@ -703,7 +838,9 @@ void MainWindow::onChatterShoutoutClicked(const QString& userId, const QString& 
 
 void MainWindow::onChatterVipToggled(const QString& userId, const QString& userName, bool checked) {
     Q_UNUSED(userName);
-    emit chatterVipToggled(userId, checked);
+    if (m_controller) {
+        QMetaObject::invokeMethod(m_controller, "onChatterVipToggled", Qt::QueuedConnection, Q_ARG(QString, userId), Q_ARG(bool, checked));
+    }
 }
 
 void MainWindow::onChatterModeratorToggled(const QString& userId, const QString& userName, bool checked) {
@@ -715,10 +852,12 @@ void MainWindow::onChatterModeratorToggled(const QString& userId, const QString&
         
     auto res = QMessageBox::question(this, "モデレーター権限変更", msg, QMessageBox::Yes | QMessageBox::No);
     if (res == QMessageBox::Yes) {
-        emit chatterModeratorToggled(userId, checked);
+        if (m_controller) {
+            QMetaObject::invokeMethod(m_controller, "onChatterModeratorToggled", Qt::QueuedConnection, Q_ARG(QString, userId), Q_ARG(bool, checked));
+        }
     } else {
         if (row) {
-            row->updateButtonsFromBadge(row->userBadge()); // 以前の状態に戻す
+            row->updateButtonsFromBadges(row->userBadges()); // 以前の状態に戻す
         }
     }
 }
@@ -733,7 +872,9 @@ void MainWindow::onChatterTimeoutClicked(const QString& userId, const QString& u
         QString confirmMsg = QString("本当に %1 を %2 分間タイムアウトしますか？").arg(userName).arg(minutes);
         auto res = QMessageBox::question(this, "タイムアウト確認", confirmMsg, QMessageBox::Yes | QMessageBox::No);
         if (res == QMessageBox::Yes) {
-            emit chatterTimeoutRequested(userId, seconds);
+            if (m_controller) {
+                QMetaObject::invokeMethod(m_controller, "onChatterTimeoutRequested", Qt::QueuedConnection, Q_ARG(QString, userId), Q_ARG(int, seconds));
+            }
         }
     }
 }
@@ -745,14 +886,18 @@ void MainWindow::onChatterBanToggled(const QString& userId, const QString& userN
         QString msg = QString("本当に %1 を永久BANしますか？\n(過去のチャットもすべて削除されます)").arg(userName);
         auto res = QMessageBox::question(this, "永久BAN確認", msg, QMessageBox::Yes | QMessageBox::No);
         if (res == QMessageBox::Yes) {
-            emit chatterBanToggled(userId, true);
+            if (m_controller) {
+                QMetaObject::invokeMethod(m_controller, "onChatterBanToggled", Qt::QueuedConnection, Q_ARG(QString, userId), Q_ARG(bool, true));
+            }
         } else {
             if (row) {
-                row->updateButtonsFromBadge(row->userBadge()); // 戻す
+                row->updateButtonsFromBadges(row->userBadges()); // 戻す
             }
         }
     } else {
-        emit chatterBanToggled(userId, false); // アンBAN
+        if (m_controller) {
+            QMetaObject::invokeMethod(m_controller, "onChatterBanToggled", Qt::QueuedConnection, Q_ARG(QString, userId), Q_ARG(bool, false));
+        }
     }
 }
 
@@ -764,7 +909,7 @@ void MainWindow::onListSelectionChanged() {
     ChatterRowWidget* selectedRow = selectedItem ? qobject_cast<ChatterRowWidget*>(senderList->itemWidget(selectedItem)) : nullptr;
     QString selectedUserId = selectedRow ? selectedRow->userId() : "";
 
-    QListWidget* lists[] = { m_listAll, m_listBroadcaster, m_listModerator, m_listVip, m_listBot, m_listRegular };
+    QListWidget* lists[] = { m_listAll, m_listBroadcaster, m_listModerator, m_listVip, m_listArtist, m_listBot, m_listRegular };
     for (QListWidget* list : lists) {
         if (!list) continue;
         
@@ -803,7 +948,7 @@ void MainWindow::onShoutoutCooldownTimeout() {
 }
 
 void MainWindow::updateShoutoutButtonsEnabled(bool enabled) {
-    QListWidget* lists[] = { m_listAll, m_listBroadcaster, m_listModerator, m_listVip, m_listBot, m_listRegular };
+    QListWidget* lists[] = { m_listAll, m_listBroadcaster, m_listModerator, m_listVip, m_listArtist, m_listBot, m_listRegular };
     for (QListWidget* list : lists) {
         if (!list) continue;
         for (int i = 0; i < list->count(); ++i) {
@@ -814,4 +959,145 @@ void MainWindow::updateShoutoutButtonsEnabled(bool enabled) {
             }
         }
     }
+}
+
+void MainWindow::addChatterFromComment(const QString& userId, const QString& userName, const QStringList& badges) {
+    if (!m_listAll) return;
+
+    // すでに「すべて」リストに存在するかチェック
+    bool exists = false;
+    for (int i = 0; i < m_listAll->count(); ++i) {
+        QListWidgetItem* item = m_listAll->item(i);
+        ChatterRowWidget* row = qobject_cast<ChatterRowWidget*>(m_listAll->itemWidget(item));
+        if (row && row->userId() == userId) {
+            exists = true;
+            break;
+        }
+    }
+
+    if (exists) return; // 既に存在していれば何もしない
+
+    // 新しく追加するための振り分け先リストを決定
+    QStringList botUsers = m_configManager ? m_configManager->getBotUsers() : QStringList();
+    QStringList lowerBots;
+    for (const QString& b : botUsers) {
+        lowerBots.append(b.toLower());
+    }
+
+    QList<QListWidget*> targetLists;
+    if (lowerBots.contains(userName.toLower())) {
+        targetLists.append(m_listBot);
+    }
+    if (badges.contains("broadcaster")) {
+        targetLists.append(m_listBroadcaster);
+    }
+    if (badges.contains("moderator")) {
+        targetLists.append(m_listModerator);
+    }
+    if (badges.contains("vip")) {
+        targetLists.append(m_listVip);
+    }
+    if (badges.contains("artist")) {
+        targetLists.append(m_listArtist);
+    }
+
+    if (targetLists.isEmpty()) {
+        targetLists.append(m_listRegular);
+    }
+
+    auto connectWidget = [this](ChatterRowWidget* w) {
+        connect(w, &ChatterRowWidget::shoutoutClicked, this, &MainWindow::onChatterShoutoutClicked);
+        connect(w, &ChatterRowWidget::vipToggled, this, &MainWindow::onChatterVipToggled);
+        connect(w, &ChatterRowWidget::moderatorToggled, this, &MainWindow::onChatterModeratorToggled);
+        connect(w, &ChatterRowWidget::timeoutClicked, this, &MainWindow::onChatterTimeoutClicked);
+        connect(w, &ChatterRowWidget::banToggled, this, &MainWindow::onChatterBanToggled);
+    };
+
+    // すべてリストに追加
+    QListWidgetItem* itemAll = new QListWidgetItem(m_listAll);
+    itemAll->setSizeHint(QSize(0, 38));
+    ChatterRowWidget* widgetAll = new ChatterRowWidget(userId, userName, badges, m_listAll);
+    widgetAll->setShoutoutButtonEnabled(m_shoutoutCooldownRemaining <= 0);
+    m_listAll->setItemWidget(itemAll, widgetAll);
+    connectWidget(widgetAll);
+
+    // 対象のカテゴリリストに追加
+    for (QListWidget* targetList : targetLists) {
+        QListWidgetItem* itemTarget = new QListWidgetItem(targetList);
+        itemTarget->setSizeHint(QSize(0, 38));
+        ChatterRowWidget* widgetTarget = new ChatterRowWidget(userId, userName, badges, targetList);
+        widgetTarget->setShoutoutButtonEnabled(m_shoutoutCooldownRemaining <= 0);
+        targetList->setItemWidget(itemTarget, widgetTarget);
+        connectWidget(widgetTarget);
+    }
+
+    // アコーディオンの件数表示を更新
+    auto updateBtnText = [](QPushButton* btn, QListWidget* list, const QString& title) {
+        btn->setText(QString("%1 %2 (%3)")
+            .arg(list->isVisible() ? "▼" : "▶")
+            .arg(title)
+            .arg(list->count()));
+    };
+
+    updateBtnText(m_btnToggleAll, m_listAll, "すべて");
+    updateBtnText(m_btnToggleBroadcaster, m_listBroadcaster, "ストリーマー");
+    updateBtnText(m_btnToggleModerator, m_listModerator, "モデレーター");
+    updateBtnText(m_btnToggleVip, m_listVip, "VIP");
+    updateBtnText(m_btnToggleArtist, m_listArtist, "アーティスト");
+    updateBtnText(m_btnToggleBot, m_listBot, "チャットボット");
+    updateBtnText(m_btnToggleRegular, m_listRegular, "一般");
+}
+
+void MainWindow::showCommentContextMenu(const QPoint& pos) {
+    QModelIndex idx = ui->tableViewComments->indexAt(pos);
+    if (!idx.isValid()) return;
+
+    int row = idx.row();
+    QModelIndex msgIdx = m_chatModel->index(row, 1);
+    QString messageId = m_chatModel->data(msgIdx, Qt::UserRole + 1).toString();
+    if (messageId.isEmpty()) return;
+
+    QMenu menu(this);
+    
+    QMenu* pinSubMenu = menu.addMenu("📌 チャット上部にピン留めする");
+    QAction* act30s = pinSubMenu->addAction("30秒");
+    QAction* act1m = pinSubMenu->addAction("1分");
+    QAction* act5m = pinSubMenu->addAction("5分");
+    QAction* act15m = pinSubMenu->addAction("15分");
+    QAction* act30m = pinSubMenu->addAction("30分");
+    QAction* actEnd = pinSubMenu->addAction("配信終了まで");
+
+    QAction* actUnpin = nullptr;
+    if (!m_currentlyPinnedMessageId.isEmpty()) {
+        actUnpin = menu.addAction("❌ ピン留めを解除");
+    }
+
+    QAction* selected = menu.exec(ui->tableViewComments->viewport()->mapToGlobal(pos));
+    if (!selected) return;
+
+    if (selected == actUnpin) {
+        if (m_controller) {
+            QMetaObject::invokeMethod(m_controller, "onUnpinCommentRequested", Qt::QueuedConnection, Q_ARG(QString, m_currentlyPinnedMessageId));
+        }
+        m_currentlyPinnedMessageId = "";
+    } else {
+        int seconds = 0;
+        if (selected == act30s) seconds = 30;
+        else if (selected == act1m) seconds = 60;
+        else if (selected == act5m) seconds = 300;
+        else if (selected == act15m) seconds = 900;
+        else if (selected == act30m) seconds = 1800;
+        else if (selected == actEnd) seconds = 0;
+
+        if (m_controller) {
+            QMetaObject::invokeMethod(m_controller, "onPinCommentRequested", Qt::QueuedConnection, Q_ARG(QString, messageId), Q_ARG(int, seconds));
+        }
+        m_currentlyPinnedMessageId = messageId;
+    }
+}
+
+void MainWindow::resizeEvent(QResizeEvent* event) {
+    QMainWindow::resizeEvent(event);
+    m_chartNeedsUpdate = true;
+    updateChartDisplay();
 }

@@ -6,6 +6,10 @@
 #include <QNetworkRequest>
 #include <QNetworkReply>
 #include <QJsonArray>
+#include <QSet>
+#include <QSharedPointer>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 TwitchEventCollectorImpl::TwitchEventCollectorImpl(QObject* eventTarget, QObject* parent)
     : QObject(parent), m_eventTarget(eventTarget)
@@ -83,6 +87,7 @@ void TwitchEventCollectorImpl::processNotification(const QJsonObject& json) {
     if (subType == "channel.chat.message") {
         QString userId = eventObj["chatter_user_id"].toString();
         QString userName = eventObj["chatter_user_name"].toString();
+        QString messageId = eventObj["message_id"].toString();
         QJsonObject messageObj = eventObj["message"].toObject();
         QString text = messageObj["text"].toString();
 
@@ -115,9 +120,9 @@ void TwitchEventCollectorImpl::processNotification(const QJsonObject& json) {
 
         // 【要件定義対応】: シグナルを使わず、Event割り込み(postEvent)でターゲットに非同期送信
         if (m_eventTarget) {
-            auto* evt = new TwitchEvents::CommentEvent(userId, userName, text, badges, badgeUrls);
+            auto* evt = new TwitchEvents::CommentEvent(userId, userName, text, badges, badgeUrls, messageId);
             QCoreApplication::postEvent(m_eventTarget, evt);
-            qDebug() << "Dispatched CommentEvent for user:" << userName << "with badges:" << badges << "and URLs:" << badgeUrls;
+            qDebug() << "Dispatched CommentEvent for user:" << userName << "with badges:" << badges << "and URLs:" << badgeUrls << "messageId:" << messageId;
         }
     }
 }
@@ -194,48 +199,135 @@ void TwitchEventCollectorImpl::requestChatters() {
         return;
     }
 
-    auto* nam = new QNetworkAccessManager(this);
-    QUrl url(QString("https://api.twitch.tv/helix/chat/chatters?broadcaster_id=%1&moderator_id=%2&first=1000")
-             .arg(m_broadcasterId).arg(m_broadcasterId));
-    QNetworkRequest request(url);
-    request.setRawHeader("Authorization", ("Bearer " + m_accessToken).toUtf8());
-    request.setRawHeader("Client-Id", m_clientId.toUtf8());
+    struct FetchContext {
+        QSet<QString> moderators;
+        QSet<QString> vips;
+        QJsonArray chattersData;
+        int pendingRequests = 3;
+        bool chattersSuccess = false;
+    };
 
-    qInfo() << "Requesting chatters list from Twitch Helix API...";
-    QNetworkReply* reply = nam->get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, nam]() {
-        if (reply->error() == QNetworkReply::NoError) {
-            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-            QJsonArray dataArray = doc.object()["data"].toArray();
-            QList<TwitchEvents::ChatterInfo> chatterList;
-            
-            for (const QJsonValue& val : dataArray) {
+    auto context = QSharedPointer<FetchContext>::create();
+    auto* nam = new QNetworkAccessManager(this);
+
+    auto checkCompletion = [this, context, nam]() {
+        context->pendingRequests--;
+        if (context->pendingRequests > 0) {
+            return;
+        }
+
+        // All API requests finished, clean up nam
+        nam->deleteLater();
+
+        QList<TwitchEvents::ChatterInfo> chatterList;
+
+        if (context->chattersSuccess) {
+            for (const QJsonValue& val : context->chattersData) {
                 QJsonObject obj = val.toObject();
                 QString userId = obj["user_id"].toString();
                 QString userName = obj["user_name"].toString();
                 if (userName.isEmpty()) {
                     userName = obj["user_login"].toString();
                 }
-                QString userBadge = obj["user_badge"].toString();
-                
+
+                // Resolve badge/role
+                QStringList userBadges;
+                if (userId == m_broadcasterId) {
+                    userBadges.append("broadcaster");
+                }
+                if (context->moderators.contains(userId)) {
+                    userBadges.append("moderator");
+                }
+                if (context->vips.contains(userId)) {
+                    userBadges.append("vip");
+                }
+
                 TwitchEvents::ChatterInfo info;
                 info.userId = userId;
                 info.userName = userName;
-                info.userBadge = userBadge;
+                info.userBadges = userBadges;
                 chatterList.append(info);
             }
-            
-            qInfo() << "Successfully fetched" << chatterList.size() << "chatters!";
-            if (m_eventTarget) {
-                auto* evt = new TwitchEvents::ChattersEvent(chatterList);
-                QCoreApplication::postEvent(m_eventTarget, evt);
-            }
+            qInfo() << "Successfully fetched" << chatterList.size() << "chatters with resolved roles!";
         } else {
-            qWarning() << "Failed to fetch chatters:" << reply->errorString() << reply->readAll();
+            qWarning() << "Failed to fetch chatters list, aborting viewer list update.";
+            return;
         }
-        reply->deleteLater();
-        nam->deleteLater();
-    });
+
+        if (m_eventTarget) {
+            auto* evt = new TwitchEvents::ChattersEvent(chatterList);
+            QCoreApplication::postEvent(m_eventTarget, evt);
+        }
+    };
+
+    auto setAuthHeaders = [this](QNetworkRequest& req) {
+        req.setRawHeader("Authorization", ("Bearer " + m_accessToken).toUtf8());
+        req.setRawHeader("Client-Id", m_clientId.toUtf8());
+    };
+
+    qInfo() << "Requesting chatters list, moderators list, and VIPs list from Twitch Helix API...";
+
+    // 1. Fetch Moderators
+    {
+        QUrl urlMod(QString("https://api.twitch.tv/helix/moderation/moderators?broadcaster_id=%1&first=100").arg(m_broadcasterId));
+        QNetworkRequest reqMod(urlMod);
+        setAuthHeaders(reqMod);
+        QNetworkReply* replyMod = nam->get(reqMod);
+        connect(replyMod, &QNetworkReply::finished, this, [replyMod, context, checkCompletion]() {
+            if (replyMod->error() == QNetworkReply::NoError) {
+                QJsonDocument doc = QJsonDocument::fromJson(replyMod->readAll());
+                QJsonArray dataArray = doc.object()["data"].toArray();
+                for (const QJsonValue& val : dataArray) {
+                    context->moderators.insert(val.toObject()["user_id"].toString());
+                }
+            } else {
+                qWarning() << "Failed to fetch moderators for role resolution:" << replyMod->errorString() << replyMod->readAll();
+            }
+            replyMod->deleteLater();
+            checkCompletion();
+        });
+    }
+
+    // 2. Fetch VIPs
+    {
+        QUrl urlVip(QString("https://api.twitch.tv/helix/channels/vips?broadcaster_id=%1&first=100").arg(m_broadcasterId));
+        QNetworkRequest reqVip(urlVip);
+        setAuthHeaders(reqVip);
+        QNetworkReply* replyVip = nam->get(reqVip);
+        connect(replyVip, &QNetworkReply::finished, this, [replyVip, context, checkCompletion]() {
+            if (replyVip->error() == QNetworkReply::NoError) {
+                QJsonDocument doc = QJsonDocument::fromJson(replyVip->readAll());
+                QJsonArray dataArray = doc.object()["data"].toArray();
+                for (const QJsonValue& val : dataArray) {
+                    context->vips.insert(val.toObject()["user_id"].toString());
+                }
+            } else {
+                qWarning() << "Failed to fetch VIPs for role resolution:" << replyVip->errorString() << replyVip->readAll();
+            }
+            replyVip->deleteLater();
+            checkCompletion();
+        });
+    }
+
+    // 3. Fetch Chatters
+    {
+        QUrl urlChatters(QString("https://api.twitch.tv/helix/chat/chatters?broadcaster_id=%1&moderator_id=%2&first=1000")
+                         .arg(m_broadcasterId).arg(m_broadcasterId));
+        QNetworkRequest reqChatters(urlChatters);
+        setAuthHeaders(reqChatters);
+        QNetworkReply* replyChatters = nam->get(reqChatters);
+        connect(replyChatters, &QNetworkReply::finished, this, [replyChatters, context, checkCompletion]() {
+            if (replyChatters->error() == QNetworkReply::NoError) {
+                QJsonDocument doc = QJsonDocument::fromJson(replyChatters->readAll());
+                context->chattersData = doc.object()["data"].toArray();
+                context->chattersSuccess = true;
+            } else {
+                qWarning() << "Failed to fetch chatters:" << replyChatters->errorString() << replyChatters->readAll();
+            }
+            replyChatters->deleteLater();
+            checkCompletion();
+        });
+    }
 }
 
 void TwitchEventCollectorImpl::sendShoutout(const QString& toBroadcasterId) {
@@ -444,4 +536,61 @@ void TwitchEventCollectorImpl::parseAndCacheBadges(const QJsonDocument& doc) {
             }
         }
     }
+}
+
+void TwitchEventCollectorImpl::pinChatMessage(const QString& messageId, int durationSeconds) {
+    if (m_broadcasterId.isEmpty()) return;
+    
+    auto* nam = new QNetworkAccessManager(this);
+    QUrl url(QString("https://api.twitch.tv/helix/chat/pins?broadcaster_id=%1&moderator_id=%2")
+             .arg(m_broadcasterId)
+             .arg(m_broadcasterId));
+             
+    QNetworkRequest request(url);
+    request.setRawHeader("Authorization", ("Bearer " + m_accessToken).toUtf8());
+    request.setRawHeader("Client-Id", m_clientId.toUtf8());
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+    QJsonObject body;
+    body["message_id"] = messageId;
+    if (durationSeconds > 0) {
+        body["duration_seconds"] = durationSeconds;
+    }
+
+    QJsonDocument doc(body);
+    QNetworkReply* reply = nam->put(request, doc.toJson());
+    connect(reply, &QNetworkReply::finished, this, [reply, nam]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            qInfo() << "Successfully pinned chat message!";
+        } else {
+            qWarning() << "Failed to pin chat message:" << reply->readAll();
+        }
+        reply->deleteLater();
+        nam->deleteLater();
+    });
+}
+
+void TwitchEventCollectorImpl::unpinChatMessage(const QString& messageId) {
+    if (m_broadcasterId.isEmpty()) return;
+    
+    auto* nam = new QNetworkAccessManager(this);
+    QUrl url(QString("https://api.twitch.tv/helix/chat/pins?broadcaster_id=%1&moderator_id=%2&message_id=%3")
+             .arg(m_broadcasterId)
+             .arg(m_broadcasterId)
+             .arg(messageId));
+             
+    QNetworkRequest request(url);
+    request.setRawHeader("Authorization", ("Bearer " + m_accessToken).toUtf8());
+    request.setRawHeader("Client-Id", m_clientId.toUtf8());
+
+    QNetworkReply* reply = nam->deleteResource(request);
+    connect(reply, &QNetworkReply::finished, this, [reply, nam]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            qInfo() << "Successfully unpinned chat message!";
+        } else {
+            qWarning() << "Failed to unpin chat message:" << reply->readAll();
+        }
+        reply->deleteLater();
+        nam->deleteLater();
+    });
 }

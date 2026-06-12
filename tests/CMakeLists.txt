@@ -9,9 +9,12 @@ FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
+set(CMAKE_AUTOMOC ON)
+
 add_executable(UnitTests 
     test_main.cpp
     ${CMAKE_SOURCE_DIR}/src/modules/DatabaseManager.cpp
+    ${CMAKE_SOURCE_DIR}/src/modules/ConfigManager.cpp
 )
 
 target_include_directories(UnitTests PRIVATE 
@@ -25,10 +28,15 @@ target_link_directories(UnitTests PRIVATE ${CMAKE_SOURCE_DIR}/lib/TransCipher-Di
 target_link_libraries(UnitTests PRIVATE
     gtest
     Qt6::Core
+    Qt6::Gui
     Qt6::Network
     Qt6::Sql
     TransCipher
 )
+
+if(WIN32)
+    target_link_libraries(UnitTests PRIVATE crypt32)
+endif()
 
 # テスト実行フォルダにもDLLをコピー
 add_custom_command(TARGET UnitTests POST_BUILD

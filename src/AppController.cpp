@@ -51,7 +51,6 @@ AppController::AppController(QObject* parent) : QObject(parent) {
     
     // 自身のインスタンスをイベントターゲットとして渡す
     m_twitchCollector = std::make_unique<TwitchEventCollectorImpl>(this);
-    m_dbManager = std::make_unique<DatabaseManager>();
     m_bouyomiIntegration = std::make_unique<BouyomiIntegrationImpl>(m_configManager.get(), this);
     
     // OBS連携モジュールの初期化 (ポートは初期化時に設定)
@@ -59,9 +58,17 @@ AppController::AppController(QObject* parent) : QObject(parent) {
     m_obsWsIntegration = nullptr; // 後でポートを取得してから初期化
     m_obsHttpServer = std::make_unique<ObsHttpServer>(this);
     
-    // CommentAnalyzerの初期化とシグナル接続
-    auto analyzer = new CommentAnalyzer(this);
+    // DatabaseManager のスレッド分離と非同期初期化
+    m_dbThread = std::make_unique<QThread>(this);
+    m_dbManager = std::make_unique<DatabaseManager>(); // 親なしで作成
+    m_dbManager->moveToThread(m_dbThread.get());
+    m_dbThread->start();
+
+    // CommentAnalyzer のスレッド分離
+    m_analyzerThread = std::make_unique<QThread>(this);
+    auto analyzer = new CommentAnalyzer(); // 親なしで作成
     analyzer->setBotUsers(m_configManager->getBotUsers());
+    analyzer->moveToThread(m_analyzerThread.get());
     
     connect(analyzer, &CommentAnalyzer::spamDetected,
             this, &AppController::emitSpamDetected);
@@ -72,41 +79,52 @@ AppController::AppController(QObject* parent) : QObject(parent) {
     connect(analyzer, &CommentAnalyzer::statisticsUpdated,
             this, &AppController::emitStatisticsUpdated);
             
+    m_analyzerThread->start();
     m_commentAnalyzer.reset(analyzer);
 }
 
 AppController::~AppController() {
     m_twitchCollector->disconnectFromTwitch();
+    
+    if (m_analyzerThread) {
+        m_analyzerThread->quit();
+        m_analyzerThread->wait();
+    }
+    if (m_dbThread) {
+        m_dbThread->quit();
+        m_dbThread->wait();
+    }
 }
 
 void AppController::initialize() {
-    // DBの初期化 (実行ファイルと同じ階層に作成)
+    // DBの初期化 (QThread上で非同期実行)
     QString dbPath = QCoreApplication::applicationDirPath() + "/twitch_comments.db";
-    if (!m_dbManager->initialize(dbPath, "application_runtime_key")) {
-        qWarning() << "Failed to initialize DBManager in AppController";
+    QMetaObject::invokeMethod(m_dbManager.get(), "initialize", Qt::QueuedConnection,
+                              Q_ARG(QString, dbPath), Q_ARG(QString, "application_runtime_key"));
+
+    // 設定を読み込み（ロードの成否に関わらず、一部の値は読み込まれている可能性がある）
+    bool configLoaded = m_configManager->loadConfig();
+    
+    // 設定ロードの成否に関わらず、各連携モジュールの初期化とサーバー起動を試みる
+    if (m_bouyomiIntegration) {
+        m_bouyomiIntegration->initialize();
     }
 
-    // 設定を読み込み、OAuth認証を開始。成功したらTwitchへ接続。
-    if (m_configManager->loadConfig()) {
-        if (m_bouyomiIntegration) {
-            m_bouyomiIntegration->initialize();
+    if (m_obsHttpServer) {
+        int httpPort = m_configManager->getObsServerPort();
+        m_obsHttpServer->setIndexFile(m_configManager->getObsOverlayFile());
+        if (m_obsHttpServer->listen(QHostAddress::Any, httpPort)) {
+            qInfo() << "OBS HTTP Server listening on port" << httpPort;
+        } else {
+            qWarning() << "Failed to start OBS HTTP Server on port" << httpPort;
         }
 
-        // HTTPサーバーとWebSocketサーバーの起動
-        if (m_obsHttpServer) {
-            int httpPort = m_configManager->getObsServerPort();
-            m_obsHttpServer->setIndexFile(m_configManager->getObsOverlayFile());
-            if (m_obsHttpServer->listen(QHostAddress::Any, httpPort)) {
-                qInfo() << "OBS HTTP Server listening on port" << httpPort;
-            } else {
-                qWarning() << "Failed to start OBS HTTP Server on port" << httpPort;
-            }
-
-            if (!m_obsWsIntegration) {
-                m_obsWsIntegration = std::make_unique<ObsWebSocketServer>(httpPort + 1, this);
-            }
+        if (!m_obsWsIntegration) {
+            m_obsWsIntegration = std::make_unique<ObsWebSocketServer>(httpPort + 1, this);
         }
+    }
 
+    if (configLoaded && !m_configManager->getClientId().isEmpty()) {
         connect(m_configManager.get(), &ConfigManager::authCompleted, this, [this](bool success, const QString& errorMsg) {
             if (success) {
                 qInfo() << "OAuth Flow Successful. Proceeding to connect Twitch EventSub...";
@@ -129,40 +147,22 @@ void AppController::initialize() {
                 }
             }
         });
-        
-        // UIの認証ボタンが押されたらフローを開始する
-        if (m_mainWindow) {
-            m_mainWindow->setConfigManager(m_configManager.get());
-            
-            connect(m_mainWindow, &MainWindow::authRequested, this, [this]() {
-                qInfo() << "Auth requested from UI. Starting OAuth Flow...";
-                m_configManager->startOAuthFlow();
-            });
-
-            connect(m_mainWindow, &MainWindow::bouyomiTestRequested, this, [this](const QString& message) {
-                if (m_bouyomiIntegration) {
-                    m_bouyomiIntegration->sendText(message);
-                }
-            });
-            connect(m_mainWindow, &MainWindow::botSettingsChanged, this, &AppController::updateBotUsers);
-            connect(m_mainWindow, &MainWindow::tabChanged, this, &AppController::onTabWidgetChanged);
-            connect(m_mainWindow, &MainWindow::chatterRefreshRequested, this, &AppController::triggerChattersFetch);
-            connect(m_mainWindow, &MainWindow::chatterShoutoutRequested, this, &AppController::onChatterShoutoutRequested);
-            connect(m_mainWindow, &MainWindow::chatterVipToggled, this, &AppController::onChatterVipToggled);
-            connect(m_mainWindow, &MainWindow::chatterModeratorToggled, this, &AppController::onChatterModeratorToggled);
-            connect(m_mainWindow, &MainWindow::chatterTimeoutRequested, this, &AppController::onChatterTimeoutRequested);
-            connect(m_mainWindow, &MainWindow::chatterBanToggled, this, &AppController::onChatterBanToggled);
-            
-            // MainWindowへDB参照を渡し、履歴をロード
-            m_mainWindow->setDatabaseManager(m_dbManager.get());
-            m_mainWindow->loadHistoryFromDb();
-        }
     } else {
-        qWarning() << "config.json could not be loaded. Missing Client ID.";
+        qWarning() << "config.json could not be loaded or twitch_client_id is empty.";
+    }
+    
+    // UIの初期設定 (設定ロードの成否に関わらず必ず行う)
+    if (m_mainWindow) {
+        m_mainWindow->setConfigManager(m_configManager.get());
+        m_mainWindow->setController(this);
+        
+        // MainWindowへDB参照を渡し、履歴をロード
+        m_mainWindow->setDatabaseManager(m_dbManager.get());
+        m_mainWindow->loadHistoryFromDb();
     }
 
     // 既にトークンが保存されていて有効なら自動接続するフロー
-    if (!m_configManager->getAccessToken().isEmpty()) {
+    if (configLoaded && !m_configManager->getClientId().isEmpty() && !m_configManager->getAccessToken().isEmpty()) {
         auto* impl = dynamic_cast<TwitchEventCollectorImpl*>(m_twitchCollector.get());
         if (impl) {
             impl->setAuthData(m_configManager->getClientId(), m_configManager->getAccessToken());
@@ -183,22 +183,57 @@ void AppController::customEvent(QEvent* event) {
         QString safeMessage = commentEvent->message();
         if (m_commentAnalyzer) {
             safeMessage = m_commentAnalyzer->sanitizeMessage(commentEvent->message());
-            m_commentAnalyzer->analyzeComment(commentEvent->userId(), commentEvent->userName(), safeMessage);
+            
+            // 解析を非同期でスレッドへ委譲
+            QObject* analyzerObj = dynamic_cast<QObject*>(m_commentAnalyzer.get());
+            QMetaObject::invokeMethod(analyzerObj, "analyzeComment", Qt::QueuedConnection,
+                                      Q_ARG(QString, commentEvent->userId()),
+                                      Q_ARG(QString, commentEvent->userName()),
+                                      Q_ARG(QString, safeMessage));
         }
 
         bool isSpam = false;
         double sentiment = 0.0;
 
-        // DBへのセキュア保存
-        m_dbManager->logComment(commentEvent->userId(), 
-                                commentEvent->userName(), 
-                                safeMessage, 
-                                sentiment, isSpam);
+        // DBへのセキュア保存を非同期でスレッドへ委譲
+        QMetaObject::invokeMethod(m_dbManager.get(), "logComment", Qt::QueuedConnection,
+                                  Q_ARG(QString, commentEvent->userId()),
+                                  Q_ARG(QString, commentEvent->userName()),
+                                  Q_ARG(QString, safeMessage),
+                                  Q_ARG(double, sentiment),
+                                  Q_ARG(bool, isSpam));
         
-        // 棒読みちゃん連携 (スパム判定が入った場合はスキップするなど後で追加可能)
+        // 棒読みちゃん連携 (スパム判定や除外設定ユーザー/ボットのコメントはスキップ)
         if (!isSpam) {
-            // 例: 「ユーザー名、メッセージ」の形式で読ませる
-            m_bouyomiIntegration->sendText(commentEvent->userName() + "、" + safeMessage);
+            bool ttsIgnored = false;
+            if (m_configManager) {
+                QString userNameLower = commentEvent->userName().toLower();
+                
+                // 1. 読み上げ除外ユーザーのチェック
+                QStringList ignoreList = m_configManager->getTtsIgnoreUsers();
+                for (const QString& u : ignoreList) {
+                    if (u.trimmed().compare(userNameLower, Qt::CaseInsensitive) == 0) {
+                        ttsIgnored = true;
+                        break;
+                    }
+                }
+                
+                // 2. ボットユーザーの自動除外チェック (ボットは読み上げない)
+                if (!ttsIgnored) {
+                    QStringList botList = m_configManager->getBotUsers();
+                    for (const QString& b : botList) {
+                        if (b.trimmed().compare(userNameLower, Qt::CaseInsensitive) == 0) {
+                            ttsIgnored = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (!ttsIgnored) {
+                // 例: 「ユーザー名、メッセージ」の形式で読ませる
+                m_bouyomiIntegration->sendText(commentEvent->userName() + "、" + safeMessage);
+            }
             
             // OBS連携 (ONに設定されているもののみ実行)
             QVariantMap obsPayload;
@@ -219,8 +254,16 @@ void AppController::customEvent(QEvent* event) {
             }
         }
 
-        // アバター画像の非同期取得・キャッシュ制御
         QString userId = commentEvent->userId();
+
+        // アーティストバッジを自動検出して永続キャッシュに記録
+        if (commentEvent->badges().contains("artist")) {
+            if (m_configManager) {
+                m_configManager->addArtist(userId);
+            }
+        }
+
+        // アバター画像の非同期取得・キャッシュ制御
         QIcon avatarIcon;
         if (m_avatarCache.contains(userId)) {
             avatarIcon = m_avatarCache[userId];
@@ -234,9 +277,11 @@ void AppController::customEvent(QEvent* event) {
 
         // UIへの反映処理
         if (m_mainWindow) {
+            QString messageId = commentEvent->messageId();
             // QtのGUIスレッドから安全にUIを更新
-            QMetaObject::invokeMethod(m_mainWindow, [this, userId, name = commentEvent->userName(), msg = safeMessage, avatarIcon, badges = commentEvent->badges()]() {
-                m_mainWindow->addCommentToView(userId, name, msg, avatarIcon, badges);
+            QMetaObject::invokeMethod(m_mainWindow, [this, userId, name = commentEvent->userName(), msg = safeMessage, avatarIcon, badges = commentEvent->badges(), messageId]() {
+                m_mainWindow->addCommentToView(userId, name, msg, avatarIcon, badges, messageId);
+                m_mainWindow->addChatterFromComment(userId, name, badges);
             }, Qt::QueuedConnection);
         }
     } else if (event->type() == TwitchEvents::chattersReceivedType()) {
@@ -247,7 +292,17 @@ void AppController::customEvent(QEvent* event) {
         onChattersTimerTimeout();
         
         if (m_mainWindow) {
-            QMetaObject::invokeMethod(m_mainWindow, [this, list = chattersEvent->chatters()]() {
+            auto list = chattersEvent->chatters();
+            if (m_configManager) {
+                for (auto& info : list) {
+                    if (m_configManager->isArtist(info.userId)) {
+                        if (!info.userBadges.contains("artist")) {
+                            info.userBadges.append("artist");
+                        }
+                    }
+                }
+            }
+            QMetaObject::invokeMethod(m_mainWindow, [this, list]() {
                 if (m_mainWindow) m_mainWindow->updateChattersList(list);
             }, Qt::QueuedConnection);
         }
@@ -280,9 +335,10 @@ void AppController::emitEmotionScored(const QString& username, const QString& me
 
 void AppController::updateBotUsers(const QStringList& bots) {
     if (m_commentAnalyzer) {
-        auto analyzer = dynamic_cast<CommentAnalyzer*>(m_commentAnalyzer.get());
-        if (analyzer) {
-            analyzer->setBotUsers(bots);
+        QObject* analyzerObj = dynamic_cast<QObject*>(m_commentAnalyzer.get());
+        if (analyzerObj) {
+            QMetaObject::invokeMethod(analyzerObj, "setBotUsers", Qt::QueuedConnection,
+                                      Q_ARG(QStringList, bots));
         }
     }
 }
@@ -457,4 +513,30 @@ void AppController::downloadAvatarImage(const QString& userId, const QString& ur
         }
         reply->deleteLater();
     });
+}
+
+void AppController::startOAuthFlow() {
+    if (m_configManager) {
+        m_configManager->startOAuthFlow();
+    }
+}
+
+void AppController::bouyomiTestRequested(const QString& message) {
+    if (m_bouyomiIntegration) {
+        m_bouyomiIntegration->sendText(message);
+    }
+}
+
+void AppController::onPinCommentRequested(const QString& messageId, int durationSeconds) {
+    auto* impl = dynamic_cast<TwitchEventCollectorImpl*>(m_twitchCollector.get());
+    if (impl) {
+        impl->pinChatMessage(messageId, durationSeconds);
+    }
+}
+
+void AppController::onUnpinCommentRequested(const QString& messageId) {
+    auto* impl = dynamic_cast<TwitchEventCollectorImpl*>(m_twitchCollector.get());
+    if (impl) {
+        impl->unpinChatMessage(messageId);
+    }
 }

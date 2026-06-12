@@ -11,10 +11,10 @@ public:
     explicit CommentAnalyzer(QObject* parent = nullptr);
     ~CommentAnalyzer() override = default;
 
-    void analyzeComment(const QString& userId, const QString& username, const QString& message) override;
+    Q_INVOKABLE void analyzeComment(const QString& userId, const QString& username, const QString& message) override;
     QString sanitizeMessage(const QString& message) override;
 
-    void setBotUsers(const QStringList& bots);
+    Q_INVOKABLE void setBotUsers(const QStringList& bots);
 
 signals:
     // 解析結果の通知シグナル

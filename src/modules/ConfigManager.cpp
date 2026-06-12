@@ -7,9 +7,13 @@
 #include <QUrlQuery>
 #include <QDebug>
 #include <QCoreApplication>
-#include <QDesktopServices>
 #include <QJsonArray>
 #include <cipher_engine.h>
+
+#ifdef Q_OS_WIN
+#include <windows.h>
+#include <wincrypt.h>
+#endif
 
 ConfigManager::ConfigManager(QObject* parent) 
     : QObject(parent), m_httpServer(new QTcpServer(this)) 
@@ -55,7 +59,8 @@ bool ConfigManager::loadConfig() {
     if (bouyomiObj.contains("bouyomiExePath")) m_bouyomiExePath = bouyomiObj["bouyomiExePath"].toString();
     if (bouyomiObj.contains("bouyomiVoice")) m_bouyomiVoice = bouyomiObj["bouyomiVoice"].toInt();
     if (bouyomiObj.contains("bouyomiVolume")) m_bouyomiVolume = bouyomiObj["bouyomiVolume"].toInt();
-    if (bouyomiObj.contains("bouyomiAutoStart")) m_bouyomiAutoStart = bouyomiObj["bouyomiAutoStart"].toBool();
+    if (bouyomiObj.contains("auto_start")) m_bouyomiAutoStart = bouyomiObj["auto_start"].toBool();
+    else if (bouyomiObj.contains("bouyomiAutoStart")) m_bouyomiAutoStart = bouyomiObj["bouyomiAutoStart"].toBool();
     if (bouyomiObj.contains("auto_stop")) {
         m_bouyomiAutoStop = bouyomiObj["auto_stop"].toBool();
     }
@@ -83,10 +88,30 @@ bool ConfigManager::loadConfig() {
         }
     }
 
+    if (json.contains("tts_ignore_users") && json["tts_ignore_users"].isArray()) {
+        QJsonArray ignoreArray = json["tts_ignore_users"].toArray();
+        m_ttsIgnoreUsers.clear();
+        for (const QJsonValue& val : ignoreArray) {
+            if (val.isString()) {
+                m_ttsIgnoreUsers.append(val.toString());
+            }
+        }
+    }
+
+    if (json.contains("artist_user_ids") && json["artist_user_ids"].isArray()) {
+        QJsonArray artistArray = json["artist_user_ids"].toArray();
+        m_artistUserIds.clear();
+        for (const QJsonValue& val : artistArray) {
+            if (val.isString()) {
+                m_artistUserIds.insert(val.toString());
+            }
+        }
+    }
+
     // 認証情報の復号化と読み込み
     loadToken();
 
-    return !m_clientId.isEmpty() && !m_redirectUri.isEmpty();
+    return true;
 }
 
 void ConfigManager::saveConfig() {
@@ -122,18 +147,26 @@ void ConfigManager::saveConfig() {
     }
     rootObj["bot_users"] = botArray;
 
+    QJsonArray ignoreArray;
+    for (const QString& user : m_ttsIgnoreUsers) {
+        ignoreArray.append(user);
+    }
+    rootObj["tts_ignore_users"] = ignoreArray;
+
+    QJsonArray artistArray;
+    for (const QString& artistId : m_artistUserIds) {
+        artistArray.append(artistId);
+    }
+    rootObj["artist_user_ids"] = artistArray;
+
     // トークン情報の暗号化と保存
     QJsonDocument doc(rootObj);
     file.write(doc.toJson());
 }
 
 void ConfigManager::startOAuthFlow() {
-    // 既にトークンがあればスキップ
-    if (!m_accessToken.isEmpty()) {
-        qInfo() << "Access token already loaded. Skipping OAuth flow.";
-        emit authCompleted(true, "");
-        return;
-    }
+    // トークンをクリアして再認証フローを強制する
+    m_accessToken.clear();
 
     // ローカルサーバーを起動 (例: http://localhost:30080/)
     QUrl redirectUrl(m_redirectUri);
@@ -152,7 +185,7 @@ void ConfigManager::startOAuthFlow() {
                               "?response_type=token"
                               "&client_id=%1"
                               "&redirect_uri=%2"
-                              "&scope=user:read:chat%20user:write:chat%20moderator:read:chatters%20moderator:manage:shoutouts%20channel:manage:vips%20channel:manage:moderators%20moderator:manage:banned_users")
+                              "&scope=user:read:chat%20user:write:chat%20moderator:read:chatters%20moderator:manage:shoutouts%20channel:manage:vips%20channel:manage:moderators%20moderator:manage:banned_users%20moderator:manage:chat_messages")
                           .arg(m_clientId)
                           .arg(m_redirectUri);
                           
@@ -242,7 +275,27 @@ void ConfigManager::sendHtmlResponse(QTcpSocket* socket, const QString& html) {
 }
 
 void ConfigManager::saveToken(const QString& token) {
-    // トークンを平文で保存するのは危険なので TransCipher で暗号化する
+#ifdef Q_OS_WIN
+    QByteArray tokenData = token.toUtf8();
+    DATA_BLOB dataIn;
+    DATA_BLOB dataOut;
+    
+    dataIn.pbData = reinterpret_cast<BYTE*>(tokenData.data());
+    dataIn.cbData = static_cast<DWORD>(tokenData.size());
+    
+    // Protect using DPAPI (current user scope)
+    if (CryptProtectData(&dataIn, L"TwitchToken", nullptr, nullptr, nullptr, 0, &dataOut)) {
+        QString tokenPath = QCoreApplication::applicationDirPath() + "/tokens.enc";
+        QFile file(tokenPath);
+        if (file.open(QIODevice::WriteOnly)) {
+            file.write(reinterpret_cast<const char*>(dataOut.pbData), dataOut.cbData);
+        }
+        LocalFree(dataOut.pbData);
+    } else {
+        qWarning() << "DPAPI Encryption failed.";
+    }
+#else
+    // Fallback to TransCipher
     CipherResult res = CipherEngine::encrypt(token.toUtf8(), m_cipherKey);
     if (res.isSuccess()) {
         QString tokenPath = QCoreApplication::applicationDirPath() + "/tokens.enc";
@@ -251,6 +304,7 @@ void ConfigManager::saveToken(const QString& token) {
             file.write(res.data());
         }
     }
+#endif
 }
 
 bool ConfigManager::getBouyomiAutoStart() const {
@@ -302,13 +356,55 @@ void ConfigManager::setObsOverlayFile(const QString& filename) {
 }
 
 QStringList ConfigManager::getBotUsers() const {
-    return m_botUsers;
+    QStringList merged = m_botUsers;
+    QStringList defaultBots = {
+        "nightbot", "frostytools", "soundalerts", "streamelements",
+        "moobot", "wizebot", "fossabot", "phantombot", "coebot"
+    };
+    for (const QString& db : defaultBots) {
+        bool found = false;
+        for (const QString& b : merged) {
+            if (b.trimmed().compare(db, Qt::CaseInsensitive) == 0) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            merged.append(db);
+        }
+    }
+    return merged;
 }
 
 void ConfigManager::setBotUsers(const QStringList& bots) {
     m_botUsers = bots;
 }
 
+QStringList ConfigManager::getTtsIgnoreUsers() const {
+    return m_ttsIgnoreUsers;
+}
+
+void ConfigManager::setTtsIgnoreUsers(const QStringList& users) {
+    m_ttsIgnoreUsers = users;
+}
+
+bool ConfigManager::isArtist(const QString& userId) const {
+    return m_artistUserIds.contains(userId);
+}
+
+void ConfigManager::addArtist(const QString& userId) {
+    if (!m_artistUserIds.contains(userId)) {
+        m_artistUserIds.insert(userId);
+        saveConfig();
+    }
+}
+
+void ConfigManager::removeArtist(const QString& userId) {
+    if (m_artistUserIds.contains(userId)) {
+        m_artistUserIds.remove(userId);
+        saveConfig();
+    }
+}
 bool ConfigManager::loadToken() {
     QString tokenPath = QCoreApplication::applicationDirPath() + "/tokens.enc";
     QFile file(tokenPath);
@@ -317,10 +413,28 @@ bool ConfigManager::loadToken() {
     }
     
     QByteArray encData = file.readAll();
+    
+#ifdef Q_OS_WIN
+    DATA_BLOB dataIn;
+    DATA_BLOB dataOut;
+    
+    dataIn.pbData = reinterpret_cast<BYTE*>(encData.data());
+    dataIn.cbData = static_cast<DWORD>(encData.size());
+    
+    if (CryptUnprotectData(&dataIn, nullptr, nullptr, nullptr, nullptr, 0, &dataOut)) {
+        m_accessToken = QString::fromUtf8(reinterpret_cast<const char*>(dataOut.pbData), dataOut.cbData);
+        LocalFree(dataOut.pbData);
+        return true;
+    } else {
+        qWarning() << "DPAPI Decryption failed.";
+        return false;
+    }
+#else
     CipherResult res = CipherEngine::decrypt(encData, m_cipherKey);
     if (res.isSuccess()) {
         m_accessToken = QString::fromUtf8(res.data());
         return true;
     }
     return false;
+#endif
 }

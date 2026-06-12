@@ -106,7 +106,9 @@ TEST(ChattersTest, JSONParsingAndBadgeAssignment) {
         TwitchEvents::ChatterInfo info;
         info.userId = userId;
         info.userName = userName;
-        info.userBadge = userBadge;
+        if (!userBadge.isEmpty() && userBadge != "none") {
+            info.userBadges.append(userBadge);
+        }
         chatterList.append(info);
     }
 
@@ -115,22 +117,22 @@ TEST(ChattersTest, JSONParsingAndBadgeAssignment) {
     // 1: Broadcaster
     EXPECT_EQ(chatterList[0].userId, "1");
     EXPECT_EQ(chatterList[0].userName, "ストリーマー名");
-    EXPECT_EQ(chatterList[0].userBadge, "broadcaster");
+    EXPECT_TRUE(chatterList[0].userBadges.contains("broadcaster"));
 
     // 2: Moderator
     EXPECT_EQ(chatterList[1].userId, "2");
     EXPECT_EQ(chatterList[1].userName, "モデレーター名");
-    EXPECT_EQ(chatterList[1].userBadge, "moderator");
+    EXPECT_TRUE(chatterList[1].userBadges.contains("moderator"));
 
     // 3: VIP (fallback to user_login)
     EXPECT_EQ(chatterList[2].userId, "3");
     EXPECT_EQ(chatterList[2].userName, "vip_login");
-    EXPECT_EQ(chatterList[2].userBadge, "vip");
+    EXPECT_TRUE(chatterList[2].userBadges.contains("vip"));
 
     // 4: None
     EXPECT_EQ(chatterList[3].userId, "4");
     EXPECT_EQ(chatterList[3].userName, "一般ユーザー");
-    EXPECT_EQ(chatterList[3].userBadge, "none");
+    EXPECT_TRUE(chatterList[3].userBadges.isEmpty());
 }
 
 // UT-CHT-02: ボットユーザーの除外判定ロジックのテスト
@@ -173,6 +175,61 @@ TEST(ChattersTest, CooldownLogic) {
     // 10分以上なので自動更新も手動更新も可能
     EXPECT_TRUE(secsElapsed >= 180);
     EXPECT_TRUE(secsElapsed >= 600);
+}
+
+#include "ConfigManager.h"
+#include <QFile>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QCoreApplication>
+
+// UT-CFG-01: 設定の保存と読み込みの永続性テスト
+TEST(ConfigManagerTest, SaveAndLoadConfiguration) {
+    QString configPath = QCoreApplication::applicationDirPath() + "/config.json";
+    if (QFile::exists(configPath)) {
+        QFile::remove(configPath);
+    }
+
+    // テスト用のベースconfig.json作成
+    {
+        QFile file(configPath);
+        ASSERT_TRUE(file.open(QIODevice::WriteOnly));
+        QJsonObject root;
+        root["twitch_client_id"] = "test_client_id";
+        root["twitch_redirect_uri"] = "http://localhost:30080/";
+        file.write(QJsonDocument(root).toJson());
+    }
+
+    ConfigManager cfg;
+    ASSERT_TRUE(cfg.loadConfig());
+    EXPECT_EQ(cfg.getClientId(), "test_client_id");
+
+    // 各種設定の変更と保存
+    cfg.setBouyomiAutoStart(true);
+    cfg.setBouyomiAutoStop(true);
+    cfg.setObsFileOutputEnabled(true);
+    cfg.setObsWebSocketEnabled(true);
+    cfg.setObsServerPort(9090);
+    cfg.setObsOverlayFile("test_overlay.html");
+    
+    QStringList testIgnore = {"UserA", "UserB"};
+    cfg.setTtsIgnoreUsers(testIgnore);
+    
+    cfg.saveConfig();
+
+    // 新たなConfigManagerインスタンスでリロードし、永続化を検証
+    ConfigManager cfg2;
+    ASSERT_TRUE(cfg2.loadConfig());
+    EXPECT_TRUE(cfg2.getBouyomiAutoStart());
+    EXPECT_TRUE(cfg2.getBouyomiAutoStop());
+    EXPECT_TRUE(cfg2.getObsFileOutputEnabled());
+    EXPECT_TRUE(cfg2.getObsWebSocketEnabled());
+    EXPECT_EQ(cfg2.getObsServerPort(), 9090);
+    EXPECT_EQ(cfg2.getObsOverlayFile(), "test_overlay.html");
+    EXPECT_EQ(cfg2.getTtsIgnoreUsers(), testIgnore);
+
+    // テスト後のクリーンアップ
+    QFile::remove(configPath);
 }
 
 #include <QCoreApplication>

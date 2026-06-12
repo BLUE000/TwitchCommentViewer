@@ -1,4 +1,5 @@
 #pragma once
+#include <QObject>
 #include <QString>
 #include <QSqlDatabase>
 #include <QDateTime>
@@ -12,11 +13,13 @@ struct CommentLog {
 };
 
 // UT-DB-01 および要件定義に基づくSQLiteとTransCipher連携DB管理
-class DatabaseManager {
+class DatabaseManager : public QObject {
+    Q_OBJECT
 public:
-    DatabaseManager();
-    ~DatabaseManager();
+    explicit DatabaseManager(QObject* parent = nullptr);
+    ~DatabaseManager() override;
 
+public slots:
     // データベース初期化 (DBファイルパスとTransCipher用暗号化キーを渡す)
     bool initialize(const QString& dbPath, const QString& cipherKey);
 

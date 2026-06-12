@@ -9,7 +9,7 @@ namespace TwitchEvents {
 struct ChatterInfo {
     QString userId;
     QString userName;
-    QString userBadge;
+    QStringList userBadges;
 };
 
 // 独自のQEvent::Typeを登録 (1000以降を安全に利用するため registerEventType を使用)
@@ -27,13 +27,15 @@ inline QEvent::Type chattersReceivedType() {
 class CommentEvent : public QEvent {
 public:
     CommentEvent(const QString& userId, const QString& userName, const QString& message,
-                 const QStringList& badges = QStringList(), const QStringList& badgeUrls = QStringList())
+                 const QStringList& badges = QStringList(), const QStringList& badgeUrls = QStringList(),
+                 const QString& messageId = QString())
         : QEvent(commentReceivedType())
         , m_userId(userId)
         , m_userName(userName)
         , m_message(message)
         , m_badges(badges)
         , m_badgeUrls(badgeUrls)
+        , m_messageId(messageId)
     {}
 
     QString userId() const { return m_userId; }
@@ -41,6 +43,7 @@ public:
     QString message() const { return m_message; }
     QStringList badges() const { return m_badges; }
     QStringList badgeUrls() const { return m_badgeUrls; }
+    QString messageId() const { return m_messageId; }
 
 private:
     QString m_userId;
@@ -48,6 +51,7 @@ private:
     QString m_message;
     QStringList m_badges;
     QStringList m_badgeUrls;
+    QString m_messageId;
 };
 
 class ChattersEvent : public QEvent {

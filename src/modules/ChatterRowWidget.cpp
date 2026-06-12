@@ -1,11 +1,11 @@
 #include "ChatterRowWidget.h"
 #include <QSpacerItem>
 
-ChatterRowWidget::ChatterRowWidget(const QString& userId, const QString& userName, const QString& userBadge, QWidget* parent)
+ChatterRowWidget::ChatterRowWidget(const QString& userId, const QString& userName, const QStringList& userBadges, QWidget* parent)
     : QWidget(parent)
     , m_userId(userId)
     , m_userName(userName)
-    , m_userBadge(userBadge)
+    , m_userBadges(userBadges)
 {
     QHBoxLayout* mainLayout = new QHBoxLayout(this);
     mainLayout->setContentsMargins(8, 4, 8, 4);
@@ -76,7 +76,7 @@ ChatterRowWidget::ChatterRowWidget(const QString& userId, const QString& userNam
     });
 
     // 初期状態のバッジに応じたボタン表示切り替え
-    updateButtonsFromBadge(userBadge);
+    updateButtonsFromBadges(userBadges);
 }
 
 void ChatterRowWidget::setSelectedState(bool selected) {
@@ -90,26 +90,25 @@ void ChatterRowWidget::setShoutoutButtonEnabled(bool enabled) {
     }
 }
 
-void ChatterRowWidget::updateButtonsFromBadge(const QString& badge) {
+void ChatterRowWidget::updateButtonsFromBadges(const QStringList& badges) {
     // vipトグルの状態を設定
     m_btnVip->blockSignals(true);
-    m_btnVip->setChecked(badge == "vip");
+    m_btnVip->setChecked(badges.contains("vip"));
     m_btnVip->blockSignals(false);
 
     // modトグルの状態を設定
     m_btnMod->blockSignals(true);
-    m_btnMod->setChecked(badge == "moderator" || badge == "broadcaster");
+    m_btnMod->setChecked(badges.contains("moderator") || badges.contains("broadcaster"));
     m_btnMod->blockSignals(false);
 
     // 自分自身（broadcaster）や他のモデレーターに対する保護
-    if (badge == "broadcaster") {
+    if (badges.contains("broadcaster")) {
         m_btnShoutout->setEnabled(false);
         m_btnVip->setEnabled(false);
         m_btnMod->setEnabled(false);
         m_btnTimeout->setEnabled(false);
         m_btnBan->setEnabled(false);
-    } else if (badge == "moderator") {
-        m_btnMod->setEnabled(false); // モデレータ同士で解除し合えないようにする
+    } else if (badges.contains("moderator")) {
         m_btnVip->setEnabled(false); // モデレータはVIPになれない
     }
 }
@@ -127,7 +126,7 @@ void ChatterRowWidget::leaveEvent(QEvent* event) {
 }
 
 void ChatterRowWidget::updateVisibility() {
-    if (m_userBadge == "broadcaster") {
+    if (m_userBadges.contains("broadcaster")) {
         m_actionWidget->hide();
         return;
     }

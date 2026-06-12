@@ -14,6 +14,7 @@
 #include "modules/DatabaseManager.h"
 #include "modules/ConfigManager.h"
 #include <QNetworkAccessManager>
+#include <QThread>
 #include <QIcon>
 #include <QHash>
 #include <QSet>
@@ -26,9 +27,25 @@ public:
     explicit AppController(QObject* parent = nullptr);
     ~AppController() override;
 
+public slots:
     void initialize();
     void setMainWindow(MainWindow* mw) { m_mainWindow = mw; }
     void updateBotUsers(const QStringList& bots);
+    
+    // UIからの要求を処理するスロット
+    void startOAuthFlow();
+    void bouyomiTestRequested(const QString& message);
+    void onTabWidgetChanged(int index);
+    void onChattersTimerTimeout();
+    void triggerChattersFetch();
+
+    void onChatterShoutoutRequested(const QString& targetUserId);
+    void onChatterVipToggled(const QString& targetUserId, bool enable);
+    void onChatterModeratorToggled(const QString& targetUserId, bool enable);
+    void onChatterTimeoutRequested(const QString& targetUserId, int duration);
+    void onChatterBanToggled(const QString& targetUserId, bool enable);
+    void onPinCommentRequested(const QString& messageId, int durationSeconds);
+    void onUnpinCommentRequested(const QString& messageId);
 
 protected:
     // シグナルの代わりにEvent割り込みで処理を受け取る
@@ -44,21 +61,15 @@ private:
     std::unique_ptr<ObsHttpServer> m_obsHttpServer;
     std::unique_ptr<ICommentAnalyzer> m_commentAnalyzer;
     std::unique_ptr<DatabaseManager> m_dbManager;
+    std::unique_ptr<QThread> m_dbThread;
+    std::unique_ptr<QThread> m_analyzerThread;
 
     // 視聴者リスト制御用メンバ
     QDateTime m_lastChattersFetchTime;
     QTimer* m_chattersTimer = nullptr;
     bool m_chattersTabActive = false;
 
-    void onTabWidgetChanged(int index);
-    void onChattersTimerTimeout();
-    void triggerChattersFetch();
 
-    void onChatterShoutoutRequested(const QString& targetUserId);
-    void onChatterVipToggled(const QString& targetUserId, bool enable);
-    void onChatterModeratorToggled(const QString& targetUserId, bool enable);
-    void onChatterTimeoutRequested(const QString& targetUserId, int duration);
-    void onChatterBanToggled(const QString& targetUserId, bool enable);
     
     // UI通知用の中継メソッド（解析タブ用）
     void emitSpamDetected(const QString& username, const QString& reason, const QString& message);

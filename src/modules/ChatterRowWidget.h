@@ -8,16 +8,16 @@
 class ChatterRowWidget : public QWidget {
     Q_OBJECT
 public:
-    explicit ChatterRowWidget(const QString& userId, const QString& userName, const QString& userBadge, QWidget* parent = nullptr);
+    explicit ChatterRowWidget(const QString& userId, const QString& userName, const QStringList& userBadges, QWidget* parent = nullptr);
     ~ChatterRowWidget() override = default;
 
     QString userId() const { return m_userId; }
     QString userName() const { return m_userName; }
-    QString userBadge() const { return m_userBadge; }
+    QStringList userBadges() const { return m_userBadges; }
 
     void setSelectedState(bool selected);
     void setShoutoutButtonEnabled(bool enabled);
-    void updateButtonsFromBadge(const QString& badge);
+    void updateButtonsFromBadges(const QStringList& badges);
 
 signals:
     void shoutoutClicked(const QString& userId, const QString& userName);
@@ -33,7 +33,7 @@ protected:
 private:
     QString m_userId;
     QString m_userName;
-    QString m_userBadge;
+    QStringList m_userBadges;
 
     bool m_hovered = false;
     bool m_selected = false;

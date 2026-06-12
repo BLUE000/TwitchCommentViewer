@@ -9,7 +9,7 @@ set(SOURCES
     ViewerMainWindow.ui
 )
 
-add_executable(TwitchCommentDbViewer ${SOURCES})
+add_executable(TwitchCommentDbViewer WIN32 ${SOURCES})
 
 # TransCipher headers and lib
 target_include_directories(TwitchCommentDbViewer PRIVATE ${CMAKE_SOURCE_DIR}/lib/TransCipher-Dist/include)

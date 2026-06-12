@@ -32,23 +32,12 @@ public:
     ~MainWindow();
 
     // UIのテーブルにコメントを追加する
-    void addCommentToView(const QString& userId, const QString& username, const QString& message, const QIcon& icon, const QStringList& badges);
+    void addCommentToView(const QString& userId, const QString& username, const QString& message, const QIcon& icon, const QStringList& badges, const QString& messageId = QString());
+    void addChatterFromComment(const QString& userId, const QString& userName, const QStringList& badges);
     void setConfigManager(ConfigManager* configManager);
     void setDatabaseManager(DatabaseManager* dbManager);
+    void setController(QObject* controller);
     void loadHistoryFromDb();
-
-signals:
-    // 設定タブで認証ボタンが押されたことを通知
-    void authRequested();
-    void bouyomiTestRequested(const QString& message);
-    void botSettingsChanged(const QStringList& bots);
-    void tabChanged(int index);
-    void chatterRefreshRequested();
-    void chatterShoutoutRequested(const QString& targetUserId);
-    void chatterVipToggled(const QString& targetUserId, bool enable);
-    void chatterModeratorToggled(const QString& targetUserId, bool enable);
-    void chatterTimeoutRequested(const QString& targetUserId, int duration);
-    void chatterBanToggled(const QString& targetUserId, bool enable);
 
 private slots:
     void on_btnStartAuth_clicked();
@@ -85,6 +74,7 @@ private slots:
     void onChatterBanToggled(const QString& userId, const QString& userName, bool checked);
     void onListSelectionChanged();
     void onShoutoutCooldownTimeout();
+    void showCommentContextMenu(const QPoint& pos);
 
     void onChartConfigChanged();
     void on_btnLaunchDbViewer_clicked();
@@ -127,6 +117,8 @@ private:
     QListWidget* m_listModerator = nullptr;
     QPushButton* m_btnToggleVip = nullptr;
     QListWidget* m_listVip = nullptr;
+    QPushButton* m_btnToggleArtist = nullptr;
+    QListWidget* m_listArtist = nullptr;
     QPushButton* m_btnToggleBot = nullptr;
     QListWidget* m_listBot = nullptr;
     QPushButton* m_btnToggleRegular = nullptr;
@@ -137,5 +129,12 @@ private:
     QString m_originalWindowTitle;
 
     void updateShoutoutButtonsEnabled(bool enabled);
+
+protected:
+    void resizeEvent(QResizeEvent* event) override;
+
+private:
+    QObject* m_controller = nullptr;
+    QString m_currentlyPinnedMessageId;
 };
 #endif // MAINWINDOW_H

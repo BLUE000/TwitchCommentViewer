@@ -55,6 +55,10 @@ target_link_libraries(TwitchCommentManager PRIVATE
     TransCipher
 )
 
+if(WIN32)
+    target_link_libraries(TwitchCommentManager PRIVATE crypt32)
+endif()
+
 # 認証情報を読み込んでマクロに渡す
 include("${CMAKE_SOURCE_DIR}/trustchain_credentials.cmake" OPTIONAL)
 
@@ -70,11 +74,12 @@ add_custom_command(TARGET TwitchCommentManager POST_BUILD
         "$<TARGET_FILE_DIR:TwitchCommentManager>/libTransCipher.dll"
 )
 
-# config.jsonをビルドディレクトリにコピー
+# config.jsonをビルドディレクトリにコピー (存在しない場合のみ)
 add_custom_command(TARGET TwitchCommentManager POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_SOURCE_DIR}/config.json"
-        "$<TARGET_FILE_DIR:TwitchCommentManager>/config.json"
+    COMMAND ${CMAKE_COMMAND}
+        "-DSRC=${CMAKE_SOURCE_DIR}/config.json"
+        "-DDST=$<TARGET_FILE_DIR:TwitchCommentManager>/config.json"
+        -P "${CMAKE_SOURCE_DIR}/tools/copy_if_not_exists.cmake"
 )
 
 # assets/overlayディレクトリをビルドディレクトリにコピー

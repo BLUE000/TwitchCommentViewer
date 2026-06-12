@@ -5,7 +5,7 @@
 #include <QDebug>
 #include <cipher_engine.h>
 
-DatabaseManager::DatabaseManager() {
+DatabaseManager::DatabaseManager(QObject* parent) : QObject(parent) {
 }
 
 DatabaseManager::~DatabaseManager() {
