@@ -1,4 +1,4 @@
-# TwitchCommentManager
+# TwitchCommentViewer
 
 TwitchCommentManagerは、Twitchで配信を行うストリーマー（配信者）のための、やさしくて多機能なコメント管理・管理サポートツールです。
 
