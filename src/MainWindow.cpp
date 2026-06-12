@@ -346,7 +346,7 @@ void MainWindow::on_btnReadme_clicked() {
 }
 
 void MainWindow::on_btnAbout_clicked() {
-    QString versionStr = "1.0.0";
+    QString versionStr = "1.1.0";
 #ifdef APP_VERSION
     versionStr = QString(APP_VERSION);
 #endif
