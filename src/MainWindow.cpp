@@ -107,6 +107,26 @@ MainWindow::MainWindow(QWidget *parent)
     ui->tableViewComments->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(ui->tableViewComments, &QTableView::customContextMenuRequested, this, &MainWindow::showCommentContextMenu);
 
+    // 読み上げ設定の変更検知接続
+    connect(ui->radUseBouyomi, &QRadioButton::toggled, this, [this](){ markTtsSettingsUnsaved(true); });
+    connect(ui->radUseVoicevox, &QRadioButton::toggled, this, [this](){ markTtsSettingsUnsaved(true); });
+    connect(ui->spinTtsVolume, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](){ markTtsSettingsUnsaved(true); });
+    connect(ui->doubleSpinTtsSpeed, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](){ markTtsSettingsUnsaved(true); });
+    connect(ui->doubleSpinTtsPitch, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](){ markTtsSettingsUnsaved(true); });
+    connect(ui->chkTtsAutoStart, &QCheckBox::toggled, this, [this](){ markTtsSettingsUnsaved(true); });
+    connect(ui->chkTtsAutoStop, &QCheckBox::toggled, this, [this](){ markTtsSettingsUnsaved(true); });
+    connect(ui->editTtsIgnoreUsers, &QLineEdit::textChanged, this, [this](){ markTtsSettingsUnsaved(true); });
+
+    connect(ui->editBouyomiHost, &QLineEdit::textChanged, this, [this](){ markTtsSettingsUnsaved(true); });
+    connect(ui->spinBouyomiPort, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](){ markTtsSettingsUnsaved(true); });
+    connect(ui->editBouyomiExe, &QLineEdit::textChanged, this, [this](){ markTtsSettingsUnsaved(true); });
+    connect(ui->comboBouyomiVoice, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](){ markTtsSettingsUnsaved(true); });
+
+    connect(ui->editVoicevoxHost, &QLineEdit::textChanged, this, [this](){ markTtsSettingsUnsaved(true); });
+    connect(ui->spinVoicevoxPort, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](){ markTtsSettingsUnsaved(true); });
+    connect(ui->editVoicevoxExe, &QLineEdit::textChanged, this, [this](){ markTtsSettingsUnsaved(true); });
+    connect(ui->spinVoicevoxSpeaker, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](){ markTtsSettingsUnsaved(true); });
+
     // ConfigManager が AppController から渡されるまでは空なので後で初期化される
 }
 
@@ -263,6 +283,8 @@ void MainWindow::setConfigManager(ConfigManager* configManager) {
     // OBSローカルのパスを生成してセットする (HTTP用)
     QString url = QString("http://localhost:%1/").arg(m_configManager->getObsServerPort());
     ui->editObsUrl->setText(url);
+
+    markTtsSettingsUnsaved(false);
 }
 
 void MainWindow::on_btnBrowseBouyomi_clicked() {
@@ -326,6 +348,7 @@ void MainWindow::on_btnSaveTts_clicked() {
     if (m_controller) {
         QMetaObject::invokeMethod(m_controller, "reloadTtsIntegration", Qt::QueuedConnection);
     }
+    markTtsSettingsUnsaved(false);
     showStatusMessage("読み上げ設定を保存しました。", 3000);
 }
 
@@ -402,6 +425,8 @@ void MainWindow::on_radUseBouyomi_toggled(bool checked) {
         ui->doubleSpinTtsSpeed->setValue(m_configManager->bouyomiSpeed());
         ui->doubleSpinTtsPitch->setValue(m_configManager->bouyomiPitch());
     }
+
+    markTtsSettingsUnsaved(true);
 }
 
 void MainWindow::on_radUseVoicevox_toggled(bool checked) {
@@ -433,6 +458,8 @@ void MainWindow::on_radUseVoicevox_toggled(bool checked) {
         ui->doubleSpinTtsSpeed->setValue(m_configManager->voicevoxSpeed());
         ui->doubleSpinTtsPitch->setValue(m_configManager->voicevoxPitch());
     }
+
+    markTtsSettingsUnsaved(true);
 }
 
 void MainWindow::on_btnToggleObs_toggled(bool checked) {
@@ -1278,4 +1305,14 @@ void MainWindow::on_btnSendAnnouncement_clicked() {
 
 void MainWindow::on_lineAnnouncementText_returnPressed() {
     on_btnSendAnnouncement_clicked();
+}
+
+void MainWindow::markTtsSettingsUnsaved(bool unsaved) {
+    if (unsaved) {
+        ui->btnSaveTts->setText("設定を保存 (要保存*)");
+        ui->btnSaveTts->setStyleSheet("QPushButton { font-weight: bold; color: #ff5500; border: 1px solid #ff5500; }");
+    } else {
+        ui->btnSaveTts->setText("設定を保存");
+        ui->btnSaveTts->setStyleSheet("");
+    }
 }

@@ -141,5 +141,6 @@ protected:
 private:
     QObject* m_controller = nullptr;
     QString m_currentlyPinnedMessageId;
+    void markTtsSettingsUnsaved(bool unsaved);
 };
 #endif // MAINWINDOW_H
