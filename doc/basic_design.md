@@ -14,7 +14,7 @@
   - `TwitchEventCollectorImpl` (WebSocket通信およびAPIクライアント)
   - `CommentAnalyzer` (形態素解析・感情分析)
   - `DatabaseManager` (暗号化SQLiteアクセス)
-  - `BouyomiIntegrationImpl` (棒読みちゃん連携用TCPソケット通信)
+  - `BouyomiIntegrationImpl` / `VoiceVoxIntegrationImpl` (音声読み上げ連携用モジュール)
   - `ObsHttpServer` (OBS連携用HTTPサーバー)
 * UIスレッドで稼働する `AppController` が仲介役となり、各ワーカースレッドに対して `Qt::QueuedConnection` を用いて非同期で指令をディスパッチし、結果をUIに伝える。これにより、コメントの大量流入時やAPIリクエスト待ちが発生した場合でも、画面のフリーズを完全に防ぐ。
 
@@ -43,8 +43,8 @@
    - コントローラからの要求を受け取り、Twitch API(HTTP)を実行してコメント送信、モデレーション操作、ピン留め操作、および**アナウンス送信**を行う。
 3. **OBS連携モジュール (`ObsIntegration` / `ObsHttpServer`)**
    - HTTPサーバー経由でOBS向けのオーバーレイ表示HTMLを提供し、チャット表示等の動的な演出を行う。
-4. **読み上げ連携モジュール (`BouyomiIntegration`)**
-   - 棒読みちゃん(TCP)やVOICEVOXへのテキスト送信を担当。
+4. **読み上げ連携モジュール (`ITtsIntegration` / `BouyomiIntegrationImpl` / `VoiceVoxIntegrationImpl`)**
+   - 棒読みちゃん(TCP)やVOICEVOX(HTTP API & Win32 PlaySound)へのテキスト送信を担当。
    - **TTS読み上げ除外フィルター**: 設定管理モジュールと連携し、ボットユーザーや特定の除外ユーザーリストに登録されたチャットは送信前に自動でスキップする。
 
 #### 内部処理モジュール

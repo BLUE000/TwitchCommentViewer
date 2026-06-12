@@ -60,9 +60,22 @@
 
 ### 2.4 設定タブ
 * Twitch接続設定（OAuth連携開始ボタン、チャンネル名入力など）。
-* 読み上げ（TTS）設定: 棒読みちゃんポート番号、音量、自動起動設定。
-* **読み上げ除外ユーザー設定**:
-  - `editTtsIgnoreUsers` (QLineEdit): 読み上げを無視するユーザー名のカンマ区切り入力欄。
+* **読み上げ（TTS）設定**:
+  - `groupBoxTts` (アコーディオン/トグルボタン `btnToggleTts` で開閉) 内に配置。
+  - **連携ツール選択**: ラジオボタン `radUseBouyomi`（棒読みちゃんを使用する）および `radUseVoicevox`（VOICEVOXを使用する）の選択式。
+  - **エンジン個別設定領域**:
+    - 棒読みちゃん用: ホスト名、ポート、実行ファイルパス（および参照ボタン）、音声種類選択（QComboBox）。
+    - VOICEVOX用: ホスト名、ポート、実行ファイルパス（および参照ボタン）、話者ID（および話者選択リスト/QComboBox）。
+  - **共通UIコントロール**:
+    - 音量 (QSpinBox): 棒読みちゃん時は -1〜100、VOICEVOX時は 0〜100。
+    - 速度/スピード (QDoubleSpinBox): 棒読みちゃん時は 50〜300 %、VOICEVOX時は 0.5〜2.0 倍。
+    - 音程/ピッチ (QDoubleSpinBox): 棒読みちゃん時は 50〜200 %、VOICEVOX時は -0.15〜0.15。
+    - 設定値は各エンジンごとに個別に保持され、ラジオボタン切り替え時に動的にUI表示範囲（最小値・最大値・ステップ・単位ラベル）を調整した上でロードされる。
+    - 自動起動/自動終了チェックボックス: `chkTtsAutoStart`（「起動時に読み上げツールを自動起動する」）、`chkTtsAutoStop`（「終了時に読み上げツールを自動終了する」）。
+  - **共通アクションエリア**:
+    - 除外ユーザー設定 `editTtsIgnoreUsers` (QLineEdit): 読み上げを無視するユーザー名のカンマ区切り入力欄。
+    - テスト送信エリア: テストテキスト入力用 QLineEdit と 「テスト送信」ボタン（`btnTestTts`）。
+    - 保存ボタン `btnSaveTts`: アクティブなラジオボタンの状態に基づき、個別および共通設定を対象のTTSエンジン設定として `config.json` に保存。
 * **BOT除外設定**:
   - `editBotUsers` (QLineEdit): BOT判定するユーザー名のカンマ区切り入力欄。
 * 権利・ライセンス表記（TrustChain・Qt等のライセンスを記載）。
@@ -129,13 +142,29 @@
 ### 4.3 内部処理モジュールクラス
 #### `ConfigManager`
 * `loadConfig()` / `saveConfig()`: 設定をJSON形式で難読化保存・復元。
+  - `activeTtsEngine`: `0` (なし), `1` (棒読みちゃん), `2` (VOICEVOX)
+  - 棒読みちゃん用個別設定: Host, Port, Exe, Voice, Volume, Speed, Pitch
+  - VOICEVOX用個別設定: Host, Port, Exe, Speaker, Volume, Speed, Pitch
+  - 共通設定: `ttsAutoStart`（自動起動）、`ttsAutoStop`（自動終了）、`ttsIgnoreUsers`（除外ユーザー）
 * `saveToken(const QString& token)` / `loadToken()`: DPAPI / TransCipherを用いた暗号化トークンの保存とロード。
 * `getBotUsers()` / `setBotUsers(const QStringList& bots)`: BOT除外判定用リストの取得・更新。
 * `getTtsIgnoreUsers()` / `setTtsIgnoreUsers(const QStringList& users)`: 読み上げ無視ユーザーリストの取得・更新。
 
+#### `ITtsIntegration`
+* 棒読みちゃんとVOICEVOXの連携を抽象化するインターフェースクラス。
+* `virtual void initialize() = 0;` (自動起動などの初期化)
+* `virtual void sendText(const QString& text) = 0;` (音声読み上げ要求)
+
 #### `BouyomiIntegrationImpl`
-* 棒読みちゃんへのTCPソケット経由でのメッセージ送出クラス。
+* `ITtsIntegration` を継承する棒読みちゃん連携クラス。TCPソケット経由でのバイナリプロトコル送信を担当。
+* 設定された速度（Speed）およびピッチ（Tone）のパラメータをバイナリデータ構造に組み込んで送信。
 * 読み上げの際、渡されたユーザー名が `ConfigManager::getTtsIgnoreUsers()` または `ConfigManager::getBotUsers()` (自動Bot除外) に合致する場合はソケット送信を行わず早期リターンする。
+
+#### `VoiceVoxIntegrationImpl`
+* `ITtsIntegration` を継承するVOICEVOX連携クラス。
+* `QNetworkAccessManager` を用いて、VOICEVOXローカルAPIに対して `/audio_query` を送信し、取得したクエリJSON内の `speedScale`、`pitchScale`、`volumeScale` などの値を `ConfigManager` の設定値で書き換え、`/synthesis` APIからWAV形式の音声データを受信。
+* 受信したWAVデータを Windows Win32 API `PlaySound` を使ってメモリから非同期再生する。
+* 読み上げ除外ユーザーの場合はAPIリクエストを行わず早期リターンする。
 
 ---
 
@@ -152,7 +181,7 @@
 3. `AppController` は非同期で `CommentAnalyzer`（解析）と `DatabaseManager`（DB保存）に処理をディスパッチ。
 4. `AppController` は `ConfigManager` を用いて読み上げ除外判定を行う。
    - 発言者が `ttsIgnoreUsers` または `botUsers` に含まれる場合: 読み上げ処理をスキップ。
-   - 含まれない場合: `BouyomiIntegration::sendText()` を呼び出して棒読みちゃんへ送出。
+   - 含まれない場合: 現在有効な `ITtsIntegration`（`BouyomiIntegrationImpl` または `VoiceVoxIntegrationImpl`）の `sendText()` を呼び出して音声読み上げ要求を送出。
 5. UIスレッドで `MainWindow::addCommentToView()` を呼び出して表示を更新。
 
 ### 5.3 チャットピン留めシーケンス
