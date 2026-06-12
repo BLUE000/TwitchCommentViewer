@@ -203,6 +203,8 @@ Copyright (c) 2026 BLUE000
 
 ### サードパーティ・ライセンス
 
+本ソフトウェアは、以下のオープンソースライブラリおよびセキュリティモジュールを利用しています。
+
 This software uses TrustChain Module. Copyright (c) 2026 BLUE000.  
 Includes TransCipher, Copyright (c) 2026 BLUE000. (https://github.com/BLUE000/TransCipher-Dist)  
 Includes BinMarkManager, Copyright (c) 2026 BLUE000. (https://github.com/BLUE000/BinMarkManager)  
