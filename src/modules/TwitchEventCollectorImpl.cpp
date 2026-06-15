@@ -124,6 +124,20 @@ void TwitchEventCollectorImpl::processNotification(const QJsonObject& json) {
             QCoreApplication::postEvent(m_eventTarget, evt);
             qDebug() << "Dispatched CommentEvent for user:" << userName << "with badges:" << badges << "and URLs:" << badgeUrls << "messageId:" << messageId;
         }
+    } else if (subType == "stream.online") {
+        QString startedAtStr = eventObj["started_at"].toString();
+        QDateTime startedAt = QDateTime::fromString(startedAtStr, Qt::ISODate);
+        qInfo() << "Received stream.online notification! Started at:" << startedAt;
+        if (m_eventTarget) {
+            auto* evt = new TwitchEvents::StreamOnlineEvent(startedAt);
+            QCoreApplication::postEvent(m_eventTarget, evt);
+        }
+    } else if (subType == "stream.offline") {
+        qInfo() << "Received stream.offline notification!";
+        if (m_eventTarget) {
+            auto* evt = new TwitchEvents::StreamOfflineEvent();
+            QCoreApplication::postEvent(m_eventTarget, evt);
+        }
     }
 }
 
@@ -147,6 +161,7 @@ void TwitchEventCollectorImpl::fetchBroadcasterIdAndSubscribe() {
                 qInfo() << "Fetched Broadcaster ID:" << m_broadcasterId;
                 fetchBadges();
                 registerSubscription();
+                checkCurrentStreamStatus();
             } else {
                 qWarning() << "No user data found.";
             }
@@ -159,34 +174,79 @@ void TwitchEventCollectorImpl::fetchBroadcasterIdAndSubscribe() {
 }
 
 void TwitchEventCollectorImpl::registerSubscription() {
+    // 1. channel.chat.message (チャットメッセージイベント)
+    QJsonObject chatCondition;
+    chatCondition["broadcaster_user_id"] = m_broadcasterId;
+    chatCondition["user_id"] = m_broadcasterId;
+    sendSubscriptionRequest("channel.chat.message", "1", chatCondition);
+
+    // 2. stream.online (配信開始イベント)
+    QJsonObject onlineCondition;
+    onlineCondition["broadcaster_user_id"] = m_broadcasterId;
+    sendSubscriptionRequest("stream.online", "1", onlineCondition);
+
+    // 3. stream.offline (配信終了イベント)
+    QJsonObject offlineCondition;
+    offlineCondition["broadcaster_user_id"] = m_broadcasterId;
+    sendSubscriptionRequest("stream.offline", "1", offlineCondition);
+}
+
+void TwitchEventCollectorImpl::sendSubscriptionRequest(const QString& type, const QString& version, const QJsonObject& condition) {
     auto* nam = new QNetworkAccessManager(this);
     QNetworkRequest request(QUrl("https://api.twitch.tv/helix/eventsub/subscriptions"));
     request.setRawHeader("Authorization", ("Bearer " + m_accessToken).toUtf8());
     request.setRawHeader("Client-Id", m_clientId.toUtf8());
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
-    QJsonObject condition;
-    condition["broadcaster_user_id"] = m_broadcasterId;
-    condition["user_id"] = m_broadcasterId; // For reading chat, both are the broadcaster's ID
-
     QJsonObject transport;
     transport["method"] = "websocket";
     transport["session_id"] = m_sessionId;
 
     QJsonObject payload;
-    payload["type"] = "channel.chat.message";
-    payload["version"] = "1";
+    payload["type"] = type;
+    payload["version"] = version;
     payload["condition"] = condition;
     payload["transport"] = transport;
 
     QJsonDocument doc(payload);
     QNetworkReply* reply = nam->post(request, doc.toJson());
     
-    connect(reply, &QNetworkReply::finished, this, [reply, nam]() {
+    connect(reply, &QNetworkReply::finished, this, [type, reply, nam]() {
         if (reply->error() == QNetworkReply::NoError) {
-            qInfo() << "Successfully subscribed to channel.chat.message via WebSocket!";
+            qInfo() << "Successfully subscribed to" << type << "via EventSub WebSocket!";
         } else {
-            qWarning() << "Subscription failed:" << reply->errorString() << reply->readAll();
+            qWarning() << "Subscription failed for" << type << ":" << reply->errorString() << reply->readAll();
+        }
+        reply->deleteLater();
+        nam->deleteLater();
+    });
+}
+
+void TwitchEventCollectorImpl::checkCurrentStreamStatus() {
+    auto* nam = new QNetworkAccessManager(this);
+    QUrl url("https://api.twitch.tv/helix/streams?user_id=" + m_broadcasterId);
+    QNetworkRequest request(url);
+    request.setRawHeader("Authorization", ("Bearer " + m_accessToken).toUtf8());
+    request.setRawHeader("Client-Id", m_clientId.toUtf8());
+
+    QNetworkReply* reply = nam->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, nam]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+            QJsonArray data = doc.object()["data"].toArray();
+            if (!data.isEmpty()) {
+                QString startedAtStr = data[0].toObject()["started_at"].toString();
+                QDateTime startedAt = QDateTime::fromString(startedAtStr, Qt::ISODate);
+                qInfo() << "Checked stream status: Stream is currently LIVE, started at" << startedAt;
+                if (m_eventTarget) {
+                    auto* evt = new TwitchEvents::StreamOnlineEvent(startedAt);
+                    QCoreApplication::postEvent(m_eventTarget, evt);
+                }
+            } else {
+                qInfo() << "Checked stream status: Stream is currently OFFLINE";
+            }
+        } else {
+            qWarning() << "Failed to check stream status:" << reply->errorString();
         }
         reply->deleteLater();
         nam->deleteLater();

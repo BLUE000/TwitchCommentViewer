@@ -304,6 +304,52 @@ void AppController::customEvent(QEvent* event) {
                 if (m_mainWindow) m_mainWindow->updateChattersList(list);
             }, Qt::QueuedConnection);
         }
+    } else if (event->type() == TwitchEvents::streamOnlineType()) {
+        auto* onlineEvent = static_cast<TwitchEvents::StreamOnlineEvent*>(event);
+        QDateTime startedAt = onlineEvent->startedAt();
+        qInfo() << "AppController: Stream online event received, started at" << startedAt;
+
+        // DBスレッドで非同期検索＆作成を行う
+        qint64 activeId = -1;
+        QMetaObject::invokeMethod(m_dbManager.get(), [this, startedAt, &activeId]() {
+            activeId = m_dbManager->findStreamSessionByStartTime(startedAt);
+            if (activeId == -1) {
+                activeId = m_dbManager->createStreamSession(startedAt);
+            }
+        }, Qt::BlockingQueuedConnection);
+
+        m_activeSessionId = activeId;
+        qInfo() << "AppController: Active stream session ID set to:" << m_activeSessionId;
+
+        // UIへ通知
+        if (m_mainWindow) {
+            QMetaObject::invokeMethod(m_mainWindow, [this]() {
+                if (m_mainWindow) {
+                    m_mainWindow->handleStreamStatusChanged(true, m_activeSessionId);
+                }
+            }, Qt::QueuedConnection);
+        }
+    } else if (event->type() == TwitchEvents::streamOfflineType()) {
+        qInfo() << "AppController: Stream offline event received.";
+
+        if (m_activeSessionId != -1) {
+            qint64 sessionId = m_activeSessionId;
+            QDateTime endTime = QDateTime::currentDateTime();
+            QMetaObject::invokeMethod(m_dbManager.get(), [this, sessionId, endTime]() {
+                m_dbManager->closeStreamSession(sessionId, endTime);
+            }, Qt::QueuedConnection);
+
+            m_activeSessionId = -1;
+        }
+
+        // UIへ通知
+        if (m_mainWindow) {
+            QMetaObject::invokeMethod(m_mainWindow, [this]() {
+                if (m_mainWindow) {
+                    m_mainWindow->handleStreamStatusChanged(false, -1);
+                }
+            }, Qt::QueuedConnection);
+        }
     } else {
         QObject::customEvent(event);
     }

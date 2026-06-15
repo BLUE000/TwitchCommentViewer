@@ -46,6 +46,20 @@ bool DatabaseManager::createTables() {
         qWarning() << "Failed to create chat_logs table:" << query.lastError().text();
         return false;
     }
+
+    // 配信セッション管理用テーブル
+    QString createSessionsSql = 
+        "CREATE TABLE IF NOT EXISTS stream_sessions ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "start_time DATETIME NOT NULL, "
+        "end_time DATETIME"
+        ")";
+
+    if (!query.exec(createSessionsSql)) {
+        qWarning() << "Failed to create stream_sessions table:" << query.lastError().text();
+        return false;
+    }
+
     return true;
 }
 
@@ -152,4 +166,70 @@ bool DatabaseManager::clearHistory(const QDateTime& start, const QDateTime& end)
         return false;
     }
     return true;
+}
+
+qint64 DatabaseManager::createStreamSession(const QDateTime& startTime) {
+    QSqlQuery query(m_db);
+    query.prepare("INSERT INTO stream_sessions (start_time) VALUES (:start_time)");
+    query.bindValue(":start_time", startTime.toUTC().toString("yyyy-MM-dd HH:mm:ss"));
+    if (!query.exec()) {
+        qWarning() << "Failed to create stream session:" << query.lastError().text();
+        return -1;
+    }
+    return query.lastInsertId().toLongLong();
+}
+
+bool DatabaseManager::closeStreamSession(qint64 sessionId, const QDateTime& endTime) {
+    QSqlQuery query(m_db);
+    query.prepare("UPDATE stream_sessions SET end_time = :end_time WHERE id = :id");
+    query.bindValue(":end_time", endTime.toUTC().toString("yyyy-MM-dd HH:mm:ss"));
+    query.bindValue(":id", sessionId);
+    if (!query.exec()) {
+        qWarning() << "Failed to close stream session:" << query.lastError().text();
+        return false;
+    }
+    return true;
+}
+
+qint64 DatabaseManager::findStreamSessionByStartTime(const QDateTime& startTime) {
+    QSqlQuery query(m_db);
+    QDateTime startUtc = startTime.toUTC();
+    QDateTime minTime = startUtc.addSecs(-60);
+    QDateTime maxTime = startUtc.addSecs(60);
+
+    query.prepare("SELECT id FROM stream_sessions WHERE start_time >= :min_time AND start_time <= :max_time LIMIT 1");
+    query.bindValue(":min_time", minTime.toString("yyyy-MM-dd HH:mm:ss"));
+    query.bindValue(":max_time", maxTime.toString("yyyy-MM-dd HH:mm:ss"));
+
+    if (query.exec() && query.next()) {
+        return query.value(0).toLongLong();
+    }
+    return -1;
+}
+
+QList<StreamSession> DatabaseManager::getStreamSessions() {
+    QList<StreamSession> sessions;
+    QSqlQuery query(m_db);
+    if (!query.exec("SELECT id, start_time, end_time FROM stream_sessions ORDER BY start_time DESC")) {
+        qWarning() << "Failed to get stream sessions:" << query.lastError().text();
+        return sessions;
+    }
+    while (query.next()) {
+        StreamSession session;
+        session.id = query.value(0).toLongLong();
+        
+        QString startStr = query.value(1).toString();
+        QDate startDate = QDate::fromString(startStr.left(10), "yyyy-MM-dd");
+        QTime startTime = QTime::fromString(startStr.mid(11), "HH:mm:ss");
+        session.startTime = QDateTime(startDate, startTime, QTimeZone::utc()).toLocalTime();
+        
+        if (!query.value(2).isNull()) {
+            QString endStr = query.value(2).toString();
+            QDate endDate = QDate::fromString(endStr.left(10), "yyyy-MM-dd");
+            QTime endTime = QTime::fromString(endStr.mid(11), "HH:mm:ss");
+            session.endTime = QDateTime(endDate, endTime, QTimeZone::utc()).toLocalTime();
+        }
+        sessions.append(session);
+    }
+    return sessions;
 }

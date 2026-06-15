@@ -47,6 +47,8 @@ private:
     void processNotification(const QJsonObject& json);
     void fetchBroadcasterIdAndSubscribe();
     void registerSubscription();
+    void sendSubscriptionRequest(const QString& type, const QString& version, const QJsonObject& condition);
+    void checkCurrentStreamStatus();
     void fetchBadges();
     void parseAndCacheBadges(const QJsonDocument& doc);
 };

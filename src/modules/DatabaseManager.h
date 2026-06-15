@@ -12,6 +12,12 @@ struct CommentLog {
     QString userName; // 復号済みの名前
 };
 
+struct StreamSession {
+    qint64 id;
+    QDateTime startTime;
+    QDateTime endTime;
+};
+
 // UT-DB-01 および要件定義に基づくSQLiteとTransCipher連携DB管理
 class DatabaseManager : public QObject {
     Q_OBJECT
@@ -31,6 +37,12 @@ public slots:
 
     // 履歴の削除
     bool clearHistory(const QDateTime& start, const QDateTime& end);
+
+    // 配信セッションの操作
+    qint64 createStreamSession(const QDateTime& startTime);
+    bool closeStreamSession(qint64 sessionId, const QDateTime& endTime);
+    qint64 findStreamSessionByStartTime(const QDateTime& startTime);
+    QList<StreamSession> getStreamSessions();
 
 private:
     QSqlDatabase m_db;

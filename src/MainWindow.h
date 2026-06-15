@@ -12,6 +12,7 @@
 #include <QtCharts/QDateTimeAxis>
 #include <QtCharts/QValueAxis>
 #include <QListWidget>
+#include <QComboBox>
 #include <QLabel>
 #include <QPushButton>
 #include "events/TwitchEvents.h"
@@ -19,9 +20,8 @@
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
+#include "modules/DatabaseManager.h"
 class ConfigManager;
-class DatabaseManager;
-struct CommentLog;
 
 class MainWindow : public QMainWindow
 {
@@ -70,6 +70,7 @@ public slots:
     void setUpdateButtonEnabled(bool enabled);
     void showStatusMessage(const QString& message, int timeoutMs = 5000);
     void updateAvatarIcon(const QString& userId, const QIcon& icon);
+    void handleStreamStatusChanged(bool online, qint64 activeSessionId);
 
 private slots:
     void onChatterShoutoutClicked(const QString& userId, const QString& userName);
@@ -84,6 +85,7 @@ private slots:
     void onChartConfigChanged();
     void on_btnLaunchDbViewer_clicked();
     void updateChartDisplay();
+    void onStreamSessionChanged(int index);
 
 private:
     void loadOverlayFiles();
@@ -142,5 +144,10 @@ private:
     QObject* m_controller = nullptr;
     QString m_currentlyPinnedMessageId;
     void markTtsSettingsUnsaved(bool unsaved);
+
+    QComboBox* m_comboStreamSession = nullptr;
+    QList<StreamSession> m_sessions;
+    qint64 m_activeSessionId = -1;
+    void refreshSessionsComboBox();
 };
 #endif // MAINWINDOW_H

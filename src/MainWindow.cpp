@@ -603,30 +603,25 @@ void MainWindow::setupChart() {
     
     ui->chartView->setChart(m_chart);
     ui->chartView->setRenderHint(QPainter::Antialiasing);
+
+    // 配信セッションのコントロール作成
+    QLabel* labelSession = new QLabel("対象配信:", this);
+    m_comboStreamSession = new QComboBox(this);
+    m_comboStreamSession->setObjectName("comboStreamSession");
+    m_comboStreamSession->setMinimumWidth(180);
+    
+    // レイアウトへの追加（先頭）
+    ui->horizontalLayout_stats_ctrl->insertWidget(0, labelSession);
+    ui->horizontalLayout_stats_ctrl->insertWidget(1, m_comboStreamSession);
+    
+    connect(m_comboStreamSession, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &MainWindow::onStreamSessionChanged);
 }
 
 void MainWindow::loadHistoryFromDb() {
     if (!m_dbManager) return;
     
-    m_commentHistory.clear();
-    QList<CommentLog> logs = m_dbManager->getComments();
-    
-    int total = 0;
-    QMap<QString, int> userCounts;
-    
-    for (const CommentLog& log : logs) {
-        LogEntry entry;
-        entry.time = log.timestamp.toLocalTime();
-        entry.user = log.userName;
-        m_commentHistory.append(entry);
-        
-        total++;
-        userCounts[log.userName]++;
-    }
-    
-    updateStatistics(total, userCounts);
-    m_chartNeedsUpdate = true;
-    updateChartDisplay();
+    refreshSessionsComboBox();
 }
 
 void MainWindow::onChartConfigChanged() {
@@ -1315,4 +1310,87 @@ void MainWindow::markTtsSettingsUnsaved(bool unsaved) {
         ui->btnSaveTts->setText("設定を保存");
         ui->btnSaveTts->setStyleSheet("");
     }
+}
+
+void MainWindow::onStreamSessionChanged(int index) {
+    if (!m_dbManager || index < 0 || !m_comboStreamSession) return;
+
+    qint64 sessionId = m_comboStreamSession->itemData(index).toLongLong();
+    QDateTime start, end;
+
+    if (sessionId != -1) {
+        for (const auto& session : m_sessions) {
+            if (session.id == sessionId) {
+                start = session.startTime;
+                end = session.endTime;
+                break;
+            }
+        }
+    }
+
+    m_commentHistory.clear();
+    QList<CommentLog> logs = m_dbManager->getComments(start, end);
+    
+    int total = 0;
+    QMap<QString, int> userCounts;
+    
+    for (const CommentLog& log : logs) {
+        LogEntry entry;
+        entry.time = log.timestamp.toLocalTime();
+        entry.user = log.userName;
+        m_commentHistory.append(entry);
+        
+        total++;
+        userCounts[log.userName]++;
+    }
+    
+    updateStatistics(total, userCounts);
+    m_chartNeedsUpdate = true;
+    updateChartDisplay();
+}
+
+void MainWindow::refreshSessionsComboBox() {
+    if (!m_dbManager || !m_comboStreamSession) return;
+
+    m_comboStreamSession->blockSignals(true);
+    m_comboStreamSession->clear();
+
+    m_sessions = m_dbManager->getStreamSessions();
+
+    m_comboStreamSession->addItem("全期間", -1);
+
+    for (const auto& session : m_sessions) {
+        QString timeStr = session.startTime.toString("yyyy/MM/dd HH:mm");
+        if (session.endTime.isValid()) {
+            timeStr += " ~ " + session.endTime.toString("HH:mm");
+        } else {
+            timeStr += " ~ (配信中)";
+        }
+        m_comboStreamSession->addItem(timeStr, session.id);
+    }
+
+    m_comboStreamSession->blockSignals(false);
+    
+    if (m_activeSessionId != -1) {
+        int targetIndex = 0;
+        for (int i = 0; i < m_comboStreamSession->count(); ++i) {
+            if (m_comboStreamSession->itemData(i).toLongLong() == m_activeSessionId) {
+                targetIndex = i;
+                break;
+            }
+        }
+        m_comboStreamSession->setCurrentIndex(targetIndex);
+    } else {
+        m_comboStreamSession->setCurrentIndex(0);
+    }
+}
+
+void MainWindow::handleStreamStatusChanged(bool online, qint64 activeSessionId) {
+    m_activeSessionId = activeSessionId;
+    if (online) {
+        showStatusMessage("配信の開始イベントを受信しました。新セッションを開始します。");
+    } else {
+        showStatusMessage("配信の終了イベントを受信しました。セッションを終了します。");
+    }
+    refreshSessionsComboBox();
 }

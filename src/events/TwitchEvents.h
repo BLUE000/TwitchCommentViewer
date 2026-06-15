@@ -3,6 +3,7 @@
 #include <QString>
 #include <QStringList>
 #include <QList>
+#include <QDateTime>
 
 namespace TwitchEvents {
 
@@ -13,13 +14,23 @@ struct ChatterInfo {
 };
 
 // 独自のQEvent::Typeを登録 (1000以降を安全に利用するため registerEventType を使用)
-// inlineだと翻訳単位ごとに異なるIDが振られる事故を防ぐため関数でくるむ
+// inlineだと翻訳単位ごとに異なるIDが振られる事故を防群のため関数でくるむ
 inline QEvent::Type commentReceivedType() {
     static QEvent::Type type = static_cast<QEvent::Type>(QEvent::registerEventType());
     return type;
 }
 
 inline QEvent::Type chattersReceivedType() {
+    static QEvent::Type type = static_cast<QEvent::Type>(QEvent::registerEventType());
+    return type;
+}
+
+inline QEvent::Type streamOnlineType() {
+    static QEvent::Type type = static_cast<QEvent::Type>(QEvent::registerEventType());
+    return type;
+}
+
+inline QEvent::Type streamOfflineType() {
     static QEvent::Type type = static_cast<QEvent::Type>(QEvent::registerEventType());
     return type;
 }
@@ -65,6 +76,26 @@ public:
 
 private:
     QList<ChatterInfo> m_chatters;
+};
+
+class StreamOnlineEvent : public QEvent {
+public:
+    explicit StreamOnlineEvent(const QDateTime& startedAt)
+        : QEvent(streamOnlineType())
+        , m_startedAt(startedAt)
+    {}
+
+    QDateTime startedAt() const { return m_startedAt; }
+
+private:
+    QDateTime m_startedAt;
+};
+
+class StreamOfflineEvent : public QEvent {
+public:
+    StreamOfflineEvent()
+        : QEvent(streamOfflineType())
+    {}
 };
 
 } // namespace TwitchEvents

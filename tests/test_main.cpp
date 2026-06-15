@@ -69,6 +69,44 @@ TEST(DatabaseManagerTest, SQLiteIntegrationWithTransCipher) {
     db.close();
 }
 
+// UT-DB-03: DatabaseManager を用いた配信セッション情報操作テスト
+TEST(DatabaseManagerTest, StreamSessionOperations) {
+    QString testDbPath = "test_twitch_comments_sessions.db";
+    QString testKey = "test_sessions_key";
+    
+    if (QFile::exists(testDbPath)) {
+        QFile::remove(testDbPath);
+    }
+
+    DatabaseManager dbm;
+    ASSERT_TRUE(dbm.initialize(testDbPath, testKey)) << "Failed to initialize DB";
+
+    QDateTime now = QDateTime::currentDateTime();
+    
+    // セッション作成
+    qint64 sessionId = dbm.createStreamSession(now);
+    ASSERT_GT(sessionId, 0) << "Failed to create stream session";
+
+    // セッション検索
+    qint64 foundId = dbm.findStreamSessionByStartTime(now);
+    EXPECT_EQ(foundId, sessionId) << "Failed to find session by start time";
+
+    // セッションクローズ
+    QDateTime end = now.addSecs(3600);
+    EXPECT_TRUE(dbm.closeStreamSession(sessionId, end)) << "Failed to close stream session";
+
+    // セッション一覧取得
+    QList<StreamSession> sessions = dbm.getStreamSessions();
+    ASSERT_EQ(sessions.size(), 1);
+    EXPECT_EQ(sessions[0].id, sessionId);
+    EXPECT_LT(qAbs(sessions[0].startTime.secsTo(now)), 2);
+    EXPECT_LT(qAbs(sessions[0].endTime.secsTo(end)), 2);
+
+    // DBをクローズして後片付け
+    QSqlDatabase db = QSqlDatabase::database("TwitchDBConnection");
+    db.close();
+}
+
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>

@@ -70,6 +70,7 @@ private:
     QDateTime m_lastChattersFetchTime;
     QTimer* m_chattersTimer = nullptr;
     bool m_chattersTabActive = false;
+    qint64 m_activeSessionId = -1;
 
 
     
