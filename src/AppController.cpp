@@ -612,3 +612,35 @@ void AppController::onBroadcastObsActionRequested(const QString& actionType, con
     }
 }
 
+void AppController::reloadObsServer() {
+    if (!m_configManager) return;
+
+    int httpPort = m_configManager->getObsServerPort();
+
+    if (m_obsHttpServer) {
+        m_obsHttpServer->setIndexFile(m_configManager->getObsOverlayFile());
+
+        if (m_obsHttpServer->serverPort() != httpPort || !m_obsHttpServer->isListening()) {
+            m_obsHttpServer->close();
+            if (m_obsHttpServer->listen(QHostAddress::Any, httpPort)) {
+                qInfo() << "OBS HTTP Server re-started and listening on port" << httpPort;
+            } else {
+                qWarning() << "Failed to restart OBS HTTP Server on port" << httpPort;
+            }
+        }
+    }
+
+    if (m_configManager->getObsWebSocketEnabled()) {
+        if (!m_obsWsIntegration || m_obsWsIntegration->serverPort() != (httpPort + 1)) {
+            m_obsWsIntegration.reset();
+            m_obsWsIntegration = std::make_unique<ObsWebSocketServer>(httpPort + 1, this);
+            qInfo() << "OBS WebSocket Server re-started on port" << (httpPort + 1);
+        }
+    } else {
+        if (m_obsWsIntegration) {
+            m_obsWsIntegration.reset();
+            qInfo() << "OBS WebSocket Server stopped";
+        }
+    }
+}
+

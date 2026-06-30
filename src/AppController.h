@@ -36,6 +36,7 @@ public slots:
     void startOAuthFlow();
     void ttsTestRequested(const QString& message);
     void reloadTtsIntegration();
+    void reloadObsServer();
     void onTabWidgetChanged(int index);
     void onChattersTimerTimeout();
     void triggerChattersFetch();

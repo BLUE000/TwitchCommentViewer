@@ -70,3 +70,7 @@ void ObsWebSocketServer::sendAction(const QString& actionType, const QVariantMap
         pClient->sendTextMessage(jsonStr);
     }
 }
+
+quint16 ObsWebSocketServer::serverPort() const {
+    return m_webSocketServer ? m_webSocketServer->serverPort() : 0;
+}

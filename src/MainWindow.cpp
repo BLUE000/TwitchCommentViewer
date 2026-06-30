@@ -391,6 +391,11 @@ void MainWindow::on_btnSaveObs_clicked() {
         m_configManager->setObsBounceFactor(ui->spinObsBounceFactor->value());
         
         m_configManager->saveConfig();
+
+        // サーバーの設定を即座に適用
+        if (m_controller) {
+            QMetaObject::invokeMethod(m_controller, "reloadObsServer", Qt::QueuedConnection);
+        }
         
         QString url = QString("http://localhost:%1/").arg(ui->spinObsPort->value());
         ui->editObsUrl->setText(url);

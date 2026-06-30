@@ -12,6 +12,7 @@ public:
     ~ObsWebSocketServer() override;
 
     void sendAction(const QString& actionType, const QVariantMap& payload) override;
+    quint16 serverPort() const;
 
 private slots:
     void onNewConnection();
