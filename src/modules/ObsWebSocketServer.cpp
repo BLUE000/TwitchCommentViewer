@@ -38,8 +38,7 @@ void ObsWebSocketServer::processTextMessage(const QString& message) {
         QJsonObject obj = doc.object();
         QString action = obj["action"].toString();
         
-        // ドラッグ座標同期、または設定同期イベントの場合、送信元を除く全クライアントに転送
-        if (action == "drag_start" || action == "drag_move" || action == "drag_end" || action == "settings_changed") {
+        if (action == "drag_start" || action == "drag_move" || action == "drag_end" || action == "settings_changed" || action == "double_click") {
             for (QWebSocket* pClient : std::as_const(m_clients)) {
                 if (pClient != pSender) {
                     pClient->sendTextMessage(message);

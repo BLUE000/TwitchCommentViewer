@@ -162,14 +162,27 @@
   - 棒読みちゃん用個別設定: Host, Port, Exe, Voice, Volume, Speed, Pitch
   - VOICEVOX用個別設定: Host, Port, Exe, Speaker, Volume, Speed, Pitch
   - 共通設定: `ttsAutoStart`（自動起動）、`ttsAutoStop`（自動終了）、`ttsIgnoreUsers`（除外ユーザー）
-  - OBS物理オーバーレイ設定: `obs_avatar_min_size`（最小サイズ, デフォルト 50）、`obs_avatar_max_size`（最大サイズ, デフォルト 150）、`obs_bounce_factor`（反発係数 %, デフォルト 30）
+  - OBS物理オーバーレイ設定:
+    - `obs_avatar_min_size`（最小サイズ, デフォルト 50）
+    - `obs_avatar_max_size`（最大サイズ, デフォルト 150）
+    - `obs_bounce_factor`（反発係数 %, デフォルト 30）
+    - `obs_browser_width`（OBSブラウザ解像度幅, デフォルト 800）
+    - `obs_browser_height`（OBSブラウザ解像度高さ, デフォルト 600）
+    - `obs_effect_symbols`（ダブルクリック時表示記号, デフォルト `"♥,♦,♣,♠"`)
+    - `obs_effect_size`（パーティクルサイズ, デフォルト 20）
+    - `obs_effect_count`（放出パーティクル数, デフォルト 5）
 * `saveToken(const QString& token)` / `loadToken()`: DPAPI / TransCipherを用いた暗号化トークンの保存とロード。
 * `getBotUsers()` / `setBotUsers(const QStringList& bots)`: BOT除外判定用リストの取得・更新。
 * `getTtsIgnoreUsers()` / `setTtsIgnoreUsers(const QStringList& users)`: 読み上げ無視ユーザーリストの取得・更新。
-* 物理設定 Getter/Setter:
+* 物理・エフェクト設定 Getter/Setter:
   - `getObsAvatarMinSize() const` / `setObsAvatarMinSize(int size)`
   - `getObsAvatarMaxSize() const` / `setObsAvatarMaxSize(int size)`
   - `getObsBounceFactor() const` / `setObsBounceFactor(int factor)`
+  - `getObsBrowserWidth() const` / `setObsBrowserWidth(int width)`
+  - `getObsBrowserHeight() const` / `setObsBrowserHeight(int height)`
+  - `getObsEffectSymbols() const` / `setObsEffectSymbols(const QString& symbols)`
+  - `getObsEffectSize() const` / `setObsEffectSize(int size)`
+  - `getObsEffectCount() const` / `setObsEffectCount(int count)`
 
 #### `ITtsIntegration`
 * 棒読みちゃんとVOICEVOXの連携を抽象化するインターフェースクラス。
@@ -266,10 +279,15 @@
 1. 管理画面（`overlay_control.html`）上でアバターがドラッグ開始された際、WebSocket経由で `drag_start` メッセージを送信。
 2. C++ `ObsWebSocketServer` が受信し、送信元以外の接続ソケット（表示画面 `overlay_physics.html`）へブロードキャスト。
 3. 表示画面側は、対象アバターの `isDragging` フラグを `true` にし、物理落下・バウンド演算を一時サスペンドする。
-4. 管理画面上でドラッグ移動中、WebSocket経由で `drag_move(x, y)` メッセージをリアルタイム送信。
-5. C++ `ObsWebSocketServer` が転送し、表示画面側のアバターの座標 `(x, y)` を直接更新する（描画のみ同期）。
+4. 管理画面上でドラッグ移動中、境界枠左上からの相対座標をスケール値で割って実解像度座標 `(x, y)` を求め、WebSocket経由で `drag_move(x, y)` メッセージをリアルタイム送信。
+5. C++ `ObsWebSocketServer` が転送し、表示画面側のアバターの座標 `(x, y)`（1:1解像度空間）を直接更新する（描画のみ同期）。
 6. ドラッグが終了した際、WebSocket経由で `drag_end` メッセージを送信。
 7. C++ `ObsWebSocketServer` が転送し、表示画面側は `isDragging` フラグを `false` に戻す。アバターはドロップされた現在座標を初速度ゼロの起点として、物理落下を再開する。
+
+### 5.7 ダブルクリックエフェクト同期シーケンス
+1. 管理画面（`overlay_control.html`）上でアバターがダブルクリックされた際、WebSocket経由で `double_click` メッセージ（`{"action": "double_click", "userId": "ユーザー名"}`）を送信し、かつ管理画面ローカルでもパーティクルエフェクト関数 `createParticles` を呼び出す。
+2. C++ `ObsWebSocketServer` が `double_click` メッセージを受信し、送信元以外の接続ソケット（表示画面 `overlay_physics.html`）へブロードキャスト。
+3. 表示画面側はメッセージを受信し、該当アバターの現在座標中心 `(x + size/2, y + size/2)` から、設定同期されている `effectSymbols`, `effectSize`, `effectCount` を用いて、四方に飛び散るフェードアウトパーティクルエフェクトを描画する。
 
 ---
 
@@ -310,11 +328,16 @@
          `y + size >= windowHeight` に達した場合、`y = windowHeight - size` に位置修正し、速度を反転・減衰：`vy = -vy * (bounceFactor / 100)`。
          ただし、`Math.abs(vy) < 0.2` になった場合は `vy = 0` とし、微小なバウンドの繰り返しによるフリーズ/無駄な計算を防ぐ（静止状態へ移行）。
   - **直立固定**: CSS `transform: translate(x, y)` のみを用いてアバターを配置し、回転（`rotate`）を適用しないことで直立を維持する。
+  - **ダブルクリック演出演出（パーティクル放出）**:
+    - `createParticles(x, y)`: アバターの中心座標を中心に、設定値 `effectCount` 個の `div`（`.particle`）を生成。
+    - 各要素に `effectSymbols` からランダムに選ばれた1文字を設定。
+    - ランダムな進行方向角度（0〜2π）と移動量から目的地座標 `(--tx, --ty)` を算出してCSS変数としてインライン設定し、1秒経過後に自動的に `remove()` する。
+    - CSSの `@keyframes fly-out` により、拡大しながら指定の目的地へ高速に飛んでフェードアウトする軽量なCSS3アニメーションを適用する。
 
 ### 6.2 プレビューおよびアバター成長ロジック
 * **初期スポーン**: 画面上端中央 `x = (windowWidth - size) / 2`, `y = 0`, `vy = 0` でアバターを生成。初期サイズは `ConfigManager` より取得した `obs_avatar_min_size`。
 * **成長判定**: 同一ユーザーからのコメント受信ごとに `commentCount` をインクリメント。サイズを `minSize + (commentCount * 10)` で拡張（上限は `obs_avatar_max_size`）。サイズ変更に合わせてDOM要素の幅・高さ、および物理境界判定の `size` を動的に更新する。
-* **吹き出し**: コメント受信時にアバターの頭上（`y - bubbleHeight`）に表示し、7秒後にフェードアウトアニメーション（CSSクラス追加）を適用してDOMから削除する。アバターの移動・落下に同期して位置を追従させる。
+* **吹き出し**: コメント受信時にアバターの頭上（`y - bubbleHeight`）に表示し（ユーザー名は含めず、メッセージ本文のみを表示）、7秒後にフェードアウトアニメーション（CSSクラス追加）を適用してDOMから削除する。アバターの移動・落下に同期して位置を追従させる。
 
 ### 6.3 セーフティガバナー（高負荷防止機構）
 * **アバター数制限**: アバター配列の要素数が **30** を超えた場合、配列先頭（最も古いアバター）を取得し、DOMからフェードアウト削除した上で配列から除去する。
@@ -323,9 +346,13 @@
   - 計算・描画処理時間が **10ms** を超えた場合、コンソールに警告ログを出力し、物理演算ループを一時停止（サスペンド状態）にする。再度安全な状態になるか、ユーザーによる管理画面からの操作が行われるまでサスペンド状態を維持し、ブラウザおよびOBSのフリーズを防止する。
 
 ### 6.4 管理操作画面 (`overlay_control.html`)
-* **構成**: 現在出現中のアバターを配置し、ドラッグ可能にする座標空間表示。
+* **構成と境界スケーリング**:
+  - 設定された解像度（`obsBrowserWidth`・`obsBrowserHeight`）に基づき、管理用ウィンドウサイズ内にアスペクト比維持で収まる最大縮小スケール `scale = Math.min(availW / obsBrowserWidth, availH / obsBrowserHeight)` を計算。
+  - 中央配置された境界枠（`#bounds`）を可視化表示し、アバター要素は境界枠内の座標でドラッグ移動を制限する（境界判定）。
 * **ドラッグ＆ドロップ実装**:
-  - `mousedown` / `mousemove` / `mouseup`（または HTML5 Drag and Drop API）を用いてアバター要素をドラッグ可能にする。
+  - `mousedown` / `mousemove` / `mouseup` を用いて境界枠内でアバター要素をドラッグ可能にする。
   - ドラッグ開始時: WebSocket経由で `{ "action": "drag_start", "userId": "..." }` を送信。
-  - ドラッグ移動中: 移動先の絶対座標を計算し、`{ "action": "drag_move", "userId": "...", "x": x, "y": y }` を送信。
+  - ドラッグ移動中: 境界枠の左上からの相対座標を算出し、`scale` で割った1:1実座標 `(x, y)` を計算して `{ "action": "drag_move", "userId": "...", "x": x, "y": y }` を送信。
   - ドラッグ終了時: `{ "action": "drag_end", "userId": "..." }` を送信。
+* **ダブルクリック演出**:
+  - アバター要素に `dblclick` リスナーを登録。ダブルクリック時にローカルで `createParticles` を呼び出すとともに、WebSocket経由で `{ "action": "double_click", "userId": "..." }` をブロードキャストする。

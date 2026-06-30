@@ -98,6 +98,18 @@ public:
     int getObsBounceFactor() const;
     void setObsBounceFactor(int factor);
 
+    int getObsBrowserWidth() const;
+    void setObsBrowserWidth(int width);
+    int getObsBrowserHeight() const;
+    void setObsBrowserHeight(int height);
+
+    QString getObsEffectSymbols() const;
+    void setObsEffectSymbols(const QString& symbols);
+    int getObsEffectSize() const;
+    void setObsEffectSize(int size);
+    int getObsEffectCount() const;
+    void setObsEffectCount(int count);
+
     // ボットユーザー設定
     QStringList getBotUsers() const;
     void setBotUsers(const QStringList& bots);
@@ -159,6 +171,11 @@ private:
     int m_obsAvatarMinSize = 50;
     int m_obsAvatarMaxSize = 150;
     int m_obsBounceFactor = 30;
+    int m_obsBrowserWidth = 800;
+    int m_obsBrowserHeight = 600;
+    QString m_obsEffectSymbols = "♥,♦,♣,♠";
+    int m_obsEffectSize = 20;
+    int m_obsEffectCount = 5;
 
     QStringList m_botUsers;
     QStringList m_ttsIgnoreUsers;

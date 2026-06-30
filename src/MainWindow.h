@@ -54,6 +54,11 @@ private slots:
     void on_spinObsAvatarMinSize_valueChanged(int value);
     void on_spinObsAvatarMaxSize_valueChanged(int value);
     void on_spinObsBounceFactor_valueChanged(int value);
+    void on_spinObsBrowserWidth_valueChanged(int value);
+    void on_spinObsBrowserHeight_valueChanged(int value);
+    void on_editObsEffectSymbols_textChanged(const QString& text);
+    void on_spinObsEffectSize_valueChanged(int value);
+    void on_spinObsEffectCount_valueChanged(int value);
     void updateObsPhysicsPreview();
     
     void on_btnToggleTts_toggled(bool checked);

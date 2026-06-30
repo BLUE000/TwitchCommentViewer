@@ -53,11 +53,14 @@
 <body>
     <div id="panel-header">
         <h1>アバター位置操作パネル</h1>
-        <p>アバターをドラッグ＆ドロップして位置を同期できます</p>
+        <p>アバターをドラッグ＆ドロップして位置を同期・ダブルクリックでエフェクトを発生させます</p>
     </div>
 
-    <div id="container"></div>
-    <div id="ground-guide"></div>
+    <div id="bounds-wrapper">
+        <div id="bounds-frame">
+            <div id="bounds-title">OBS 画面枠</div>
+        </div>
+    </div>
 
     <script>
         let wsPort = 8082; // デフォルトのフォールバック
@@ -70,6 +73,13 @@
 
         let minSize = 50;
         let maxSize = 150;
+        let obsBrowserWidth = 800;
+        let obsBrowserHeight = 600;
+        let effectSymbols = "♥,♦,♣,♠";
+        let effectSize = 20;
+        let effectCount = 5;
+
+        let scale = 1.0;
         let avatars = [];
         let activeDraggedAvatar = null;
         let dragOffsetX = 0;
@@ -89,9 +99,46 @@
             } else if (data.action === 'settings_changed') {
                 minSize = data.minSize || 50;
                 maxSize = data.maxSize || 150;
+                obsBrowserWidth = data.obsBrowserWidth || 800;
+                obsBrowserHeight = data.obsBrowserHeight || 600;
+                effectSymbols = data.effectSymbols || "♥,♦,♣,♠";
+                effectSize = data.effectSize || 20;
+                effectCount = data.effectCount || 5;
+
+                updateBoundsScale();
                 applySettings();
+            } else if (data.action === 'double_click') {
+                // 他の管理画面から送られた場合にもエフェクト同期
+                const av = avatars.find(a => a.userId === data.userId.toLowerCase());
+                if (av) {
+                    createParticles(av.x + av.size / 2, av.y + av.size / 2);
+                }
             }
         };
+
+        function updateBoundsScale() {
+            const padding = 70; // ヘッダー用の余白
+            const availW = window.innerWidth - 40;
+            const availH = window.innerHeight - padding - 40;
+
+            scale = Math.min(availW / obsBrowserWidth, availH / obsBrowserHeight);
+            if (scale <= 0) scale = 0.1;
+
+            const dx = (window.innerWidth - obsBrowserWidth * scale) / 2;
+            const dy = padding + (availH - obsBrowserHeight * scale) / 2;
+
+            const frame = document.getElementById('bounds-frame');
+            frame.style.width = `${obsBrowserWidth}px`;
+            frame.style.height = `${obsBrowserHeight}px`;
+            frame.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+            frame.style.transformOrigin = 'top left';
+
+            const title = document.getElementById('bounds-title');
+            title.textContent = `OBS 画面枠 (${obsBrowserWidth}x${obsBrowserHeight})`;
+        }
+
+        window.addEventListener('resize', updateBoundsScale);
+        updateBoundsScale();
 
         function handleComment(username, message, avatarUrl) {
             const userId = username.toLowerCase();
@@ -103,7 +150,7 @@
                 av.element.style.width = `${av.size}px`;
                 av.element.style.height = `${av.size}px`;
             } else {
-                const container = document.getElementById('container');
+                const frame = document.getElementById('bounds-frame');
                 const avDiv = document.createElement('div');
                 avDiv.className = 'avatar-container control-avatar';
                 avDiv.style.width = `${minSize}px`;
@@ -114,9 +161,8 @@
                 img.src = avatarUrl || defaultAvatar;
                 avDiv.appendChild(img);
 
-                container.appendChild(avDiv);
+                frame.appendChild(avDiv);
 
-                const windowWidth = window.innerWidth;
                 const size = minSize;
 
                 av = {
@@ -124,7 +170,7 @@
                     username: username,
                     avatarUrl: avatarUrl || defaultAvatar,
                     element: avDiv,
-                    x: (windowWidth - size) / 2,
+                    x: (obsBrowserWidth - size) / 2,
                     y: 50,
                     size: size,
                     commentCount: 1
@@ -136,7 +182,17 @@
 
                 // ドラッグイベントの登録
                 avDiv.addEventListener('mousedown', (e) => {
+                    if (e.button !== 0) return; // 左クリックのみ
                     startDrag(av, e);
+                });
+
+                // ダブルクリックイベント
+                avDiv.addEventListener('dblclick', () => {
+                    ws.send(JSON.stringify({
+                        action: 'double_click',
+                        userId: av.userId
+                    }));
+                    createParticles(av.x + av.size / 2, av.y + av.size / 2);
                 });
 
                 // アバター上限（最大30人）監視
@@ -154,8 +210,9 @@
 
         function startDrag(av, e) {
             activeDraggedAvatar = av;
-            dragOffsetX = e.clientX - av.x;
-            dragOffsetY = e.clientY - av.y;
+            // スケールされた座標系でのオフセットを算出
+            dragOffsetX = e.clientX / scale - av.x;
+            dragOffsetY = e.clientY / scale - av.y;
 
             // ドラッグ開始をサーバーへ通知
             ws.send(JSON.stringify({
@@ -168,21 +225,19 @@
             if (!activeDraggedAvatar) return;
 
             const av = activeDraggedAvatar;
-            av.x = e.clientX - dragOffsetX;
-            av.y = e.clientY - dragOffsetY;
+            av.x = e.clientX / scale - dragOffsetX;
+            av.y = e.clientY / scale - dragOffsetY;
 
-            // 境界の補正
-            const windowWidth = window.innerWidth;
-            const windowHeight = window.innerHeight;
+            // 境界の補正 (1:1の実解像度枠内に収める)
             if (av.x < 0) av.x = 0;
-            if (av.x + av.size > windowWidth) av.x = windowWidth - av.size;
+            if (av.x + av.size > obsBrowserWidth) av.x = obsBrowserWidth - av.size;
             if (av.y < 0) av.y = 0;
-            if (av.y + av.size > windowHeight) av.y = windowHeight - av.size;
+            if (av.y + av.size > obsBrowserHeight) av.y = obsBrowserHeight - av.size;
 
             // 表示位置の更新
             av.element.style.transform = `translate(${av.x}px, ${av.y}px)`;
 
-            // ドラッグ座標同期メッセージの送信
+            // ドラッグ座標同期メッセージの送信 (1:1座標)
             ws.send(JSON.stringify({
                 action: 'drag_move',
                 userId: av.userId,
@@ -204,11 +259,47 @@
             }));
         });
 
+        function createParticles(x, y) {
+            const frame = document.getElementById('bounds-frame');
+            if (!frame) return;
+
+            const symbols = effectSymbols.split(',').map(s => s.trim()).filter(s => s.length > 0);
+            if (symbols.length === 0) return;
+
+            for (let i = 0; i < effectCount; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                p.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+                p.style.left = `${x}px`;
+                p.style.top = `${y}px`;
+                p.style.fontSize = `${effectSize}px`;
+
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 40 + Math.random() * 60;
+                const tx = Math.cos(angle) * distance;
+                const ty = Math.sin(angle) * distance - 30; // 上方向バイアス
+
+                p.style.setProperty('--tx', `${tx}px`);
+                p.style.setProperty('--ty', `${ty}px`);
+
+                frame.appendChild(p);
+
+                setTimeout(() => {
+                    p.remove();
+                }, 1000);
+            }
+        }
+
         function applySettings() {
             avatars.forEach(av => {
                 av.size = Math.min(maxSize, minSize + av.commentCount * 10);
                 av.element.style.width = `${av.size}px`;
                 av.element.style.height = `${av.size}px`;
+                
+                // サイズ変更による位置補正
+                if (av.x + av.size > obsBrowserWidth) av.x = obsBrowserWidth - av.size;
+                if (av.y + av.size > obsBrowserHeight) av.y = obsBrowserHeight - av.size;
+                av.element.style.transform = `translate(${av.x}px, ${av.y}px)`;
             });
         }
     </script>

@@ -283,6 +283,11 @@ void MainWindow::setConfigManager(ConfigManager* configManager) {
     ui->spinObsAvatarMinSize->setValue(m_configManager->getObsAvatarMinSize());
     ui->spinObsAvatarMaxSize->setValue(m_configManager->getObsAvatarMaxSize());
     ui->spinObsBounceFactor->setValue(m_configManager->getObsBounceFactor());
+    ui->spinObsBrowserWidth->setValue(m_configManager->getObsBrowserWidth());
+    ui->spinObsBrowserHeight->setValue(m_configManager->getObsBrowserHeight());
+    ui->editObsEffectSymbols->setText(m_configManager->getObsEffectSymbols());
+    ui->spinObsEffectSize->setValue(m_configManager->getObsEffectSize());
+    ui->spinObsEffectCount->setValue(m_configManager->getObsEffectCount());
 
     updateObsPhysicsPreview();
     on_comboObsOverlay_currentTextChanged(m_configManager->getObsOverlayFile());
@@ -389,6 +394,11 @@ void MainWindow::on_btnSaveObs_clicked() {
         m_configManager->setObsAvatarMinSize(ui->spinObsAvatarMinSize->value());
         m_configManager->setObsAvatarMaxSize(ui->spinObsAvatarMaxSize->value());
         m_configManager->setObsBounceFactor(ui->spinObsBounceFactor->value());
+        m_configManager->setObsBrowserWidth(ui->spinObsBrowserWidth->value());
+        m_configManager->setObsBrowserHeight(ui->spinObsBrowserHeight->value());
+        m_configManager->setObsEffectSymbols(ui->editObsEffectSymbols->text());
+        m_configManager->setObsEffectSize(ui->spinObsEffectSize->value());
+        m_configManager->setObsEffectCount(ui->spinObsEffectCount->value());
         
         m_configManager->saveConfig();
 
@@ -1436,6 +1446,31 @@ void MainWindow::on_spinObsBounceFactor_valueChanged(int value) {
     updateObsPhysicsPreview();
 }
 
+void MainWindow::on_spinObsBrowserWidth_valueChanged(int value) {
+    Q_UNUSED(value);
+    updateObsPhysicsPreview();
+}
+
+void MainWindow::on_spinObsBrowserHeight_valueChanged(int value) {
+    Q_UNUSED(value);
+    updateObsPhysicsPreview();
+}
+
+void MainWindow::on_editObsEffectSymbols_textChanged(const QString& text) {
+    Q_UNUSED(text);
+    updateObsPhysicsPreview();
+}
+
+void MainWindow::on_spinObsEffectSize_valueChanged(int value) {
+    Q_UNUSED(value);
+    updateObsPhysicsPreview();
+}
+
+void MainWindow::on_spinObsEffectCount_valueChanged(int value) {
+    Q_UNUSED(value);
+    updateObsPhysicsPreview();
+}
+
 void MainWindow::updateObsPhysicsPreview() {
     int minSize = ui->spinObsAvatarMinSize->value();
     int maxSize = ui->spinObsAvatarMaxSize->value();
@@ -1448,6 +1483,11 @@ void MainWindow::updateObsPhysicsPreview() {
         payload["minSize"] = minSize;
         payload["maxSize"] = maxSize;
         payload["bounceFactor"] = bounce;
+        payload["obsBrowserWidth"] = ui->spinObsBrowserWidth->value();
+        payload["obsBrowserHeight"] = ui->spinObsBrowserHeight->value();
+        payload["effectSymbols"] = ui->editObsEffectSymbols->text();
+        payload["effectSize"] = ui->spinObsEffectSize->value();
+        payload["effectCount"] = ui->spinObsEffectCount->value();
         QMetaObject::invokeMethod(m_controller, "onBroadcastObsActionRequested", Qt::QueuedConnection,
                                   Q_ARG(QString, "settings_changed"),
                                   Q_ARG(QVariantMap, payload));

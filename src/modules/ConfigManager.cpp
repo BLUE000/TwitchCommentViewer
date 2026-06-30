@@ -123,6 +123,12 @@ bool ConfigManager::loadConfig() {
         m_obsBounceFactor = 30;
     }
 
+    m_obsBrowserWidth = json.contains("obs_browser_width") ? json["obs_browser_width"].toInt(800) : 800;
+    m_obsBrowserHeight = json.contains("obs_browser_height") ? json["obs_browser_height"].toInt(600) : 600;
+    m_obsEffectSymbols = json.contains("obs_effect_symbols") ? json["obs_effect_symbols"].toString("♥,♦,♣,♠") : "♥,♦,♣,♠";
+    m_obsEffectSize = json.contains("obs_effect_size") ? json["obs_effect_size"].toInt(20) : 20;
+    m_obsEffectCount = json.contains("obs_effect_count") ? json["obs_effect_count"].toInt(5) : 5;
+
     if (json.contains("bot_users") && json["bot_users"].isArray()) {
         QJsonArray botArray = json["bot_users"].toArray();
         m_botUsers.clear();
@@ -205,6 +211,11 @@ void ConfigManager::saveConfig() {
     rootObj["obs_avatar_min_size"] = m_obsAvatarMinSize;
     rootObj["obs_avatar_max_size"] = m_obsAvatarMaxSize;
     rootObj["obs_bounce_factor"] = m_obsBounceFactor;
+    rootObj["obs_browser_width"] = m_obsBrowserWidth;
+    rootObj["obs_browser_height"] = m_obsBrowserHeight;
+    rootObj["obs_effect_symbols"] = m_obsEffectSymbols;
+    rootObj["obs_effect_size"] = m_obsEffectSize;
+    rootObj["obs_effect_count"] = m_obsEffectCount;
 
     QJsonArray botArray;
     for (const QString& bot : m_botUsers) {
@@ -428,6 +439,46 @@ int ConfigManager::getObsBounceFactor() const {
 
 void ConfigManager::setObsBounceFactor(int factor) {
     m_obsBounceFactor = factor;
+}
+
+int ConfigManager::getObsBrowserWidth() const {
+    return m_obsBrowserWidth;
+}
+
+void ConfigManager::setObsBrowserWidth(int width) {
+    m_obsBrowserWidth = width;
+}
+
+int ConfigManager::getObsBrowserHeight() const {
+    return m_obsBrowserHeight;
+}
+
+void ConfigManager::setObsBrowserHeight(int height) {
+    m_obsBrowserHeight = height;
+}
+
+QString ConfigManager::getObsEffectSymbols() const {
+    return m_obsEffectSymbols;
+}
+
+void ConfigManager::setObsEffectSymbols(const QString& symbols) {
+    m_obsEffectSymbols = symbols;
+}
+
+int ConfigManager::getObsEffectSize() const {
+    return m_obsEffectSize;
+}
+
+void ConfigManager::setObsEffectSize(int size) {
+    m_obsEffectSize = size;
+}
+
+int ConfigManager::getObsEffectCount() const {
+    return m_obsEffectCount;
+}
+
+void ConfigManager::setObsEffectCount(int count) {
+    m_obsEffectCount = count;
 }
 
 QStringList ConfigManager::getBotUsers() const {

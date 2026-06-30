@@ -58,8 +58,8 @@
 | UT-OBS-03 | ObsHttpServer 実パス範囲検証 | 相対パス解決後に実絶対パスが `assets/overlay/` ディレクトリ配下からはみ出るリクエスト（`/../CMakeLists.txt` 等）を送信する。 | 403 Forbidden 応答が返され、対象ファイルの内容が読み込まれないこと。 | 未実装 |
 | UT-OBS-04 | ObsHttpServer CSPヘッダー付与 | 正常なファイルをリクエストする。 | レスポンスヘッダーに `Content-Security-Policy` が含まれ、自己ホストおよび指定外部ドメイン以外を制限していること。 | 未実装 |
 | UT-OBS-05 | ObsWebSocketServer メッセージリレー | 接続されたソケットAから `{ "action": "drag_move", ... }` を送信する。 | 送信元ソケットAにはエコーバックされず、接続中の他のソケットBにのみデータが転送されること。 | 未実装 |
+| UT-OBS-06 | ConfigManager追加設定保存 | ConfigManagerに解像度（Width=1024, Height=768）およびエフェクト（Symbols="★,✨", Size=25, Count=8）を設定して `saveConfig()` を実行。 | `config.json` に正しく保存され、`loadConfig()` 後に同じ値が復元されること。 | 未実装 |
 
 ## 3. テストの実行と判定基準
 * すべてのテストケースは `ctest` コマンド等により一括実行可能であること。
 * 単体テストのカバレッジは、コアロジック（`DatabaseManager`, `CommentAnalyzer` 等）において80%以上を目標とする。
-

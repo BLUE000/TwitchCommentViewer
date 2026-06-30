@@ -30,6 +30,10 @@
             console.log('Connected to OBS WebSocket Server');
         };
 
+        let effectSymbols = "♥,♦,♣,♠";
+        let effectSize = 20;
+        let effectCount = 5;
+
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
 
@@ -39,6 +43,9 @@
                 minSize = data.minSize || 50;
                 maxSize = data.maxSize || 150;
                 bounceFactor = data.bounceFactor !== undefined ? data.bounceFactor : 30;
+                effectSymbols = data.effectSymbols || "♥,♦,♣,♠";
+                effectSize = data.effectSize || 20;
+                effectCount = data.effectCount || 5;
                 console.log(`Settings updated: Min=${minSize}, Max=${maxSize}, Bounce=${bounceFactor}`);
                 applySettings();
             } else if (data.action === 'drag_start') {
@@ -47,6 +54,11 @@
                 moveAvatar(data.userId, data.x, data.y);
             } else if (data.action === 'drag_end') {
                 setDragging(data.userId, false);
+            } else if (data.action === 'double_click') {
+                const av = avatars.find(a => a.userId === data.userId.toLowerCase());
+                if (av) {
+                    createParticles(av.x + av.size / 2, av.y + av.size / 2);
+                }
             }
         };
 
@@ -128,11 +140,6 @@
             const bubble = document.createElement('div');
             bubble.className = 'comment-bubble';
             
-            const userDiv = document.createElement('div');
-            userDiv.className = 'comment-user';
-            userDiv.textContent = username;
-            bubble.appendChild(userDiv);
-
             const textDiv = document.createElement('div');
             textDiv.className = 'comment-text';
             textDiv.textContent = message;
@@ -230,6 +237,37 @@
                 document.body.appendChild(warnDiv);
             } else {
                 requestAnimationFrame(updatePhysics);
+            }
+        }
+
+        function createParticles(x, y) {
+            const container = document.getElementById('container');
+            if (!container) return;
+
+            const symbols = effectSymbols.split(',').map(s => s.trim()).filter(s => s.length > 0);
+            if (symbols.length === 0) return;
+
+            for (let i = 0; i < effectCount; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                p.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+                p.style.left = `${x}px`;
+                p.style.top = `${y}px`;
+                p.style.fontSize = `${effectSize}px`;
+
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 40 + Math.random() * 60;
+                const tx = Math.cos(angle) * distance;
+                const ty = Math.sin(angle) * distance - 30; // 若干の上方向バイアス
+
+                p.style.setProperty('--tx', `${tx}px`);
+                p.style.setProperty('--ty', `${ty}px`);
+
+                container.appendChild(p);
+
+                setTimeout(() => {
+                    p.remove();
+                }, 1000);
             }
         }
 

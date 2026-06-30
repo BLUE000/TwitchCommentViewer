@@ -329,6 +329,11 @@ TEST(ConfigManagerTest, ObsPhysicsSettings) {
     cfg.setObsAvatarMinSize(70);
     cfg.setObsAvatarMaxSize(180);
     cfg.setObsBounceFactor(45);
+    cfg.setObsBrowserWidth(1024);
+    cfg.setObsBrowserHeight(768);
+    cfg.setObsEffectSymbols("★,✨,⚡");
+    cfg.setObsEffectSize(25);
+    cfg.setObsEffectCount(8);
     cfg.saveConfig();
 
     ConfigManager cfg2;
@@ -336,6 +341,11 @@ TEST(ConfigManagerTest, ObsPhysicsSettings) {
     EXPECT_EQ(cfg2.getObsAvatarMinSize(), 70);
     EXPECT_EQ(cfg2.getObsAvatarMaxSize(), 180);
     EXPECT_EQ(cfg2.getObsBounceFactor(), 45);
+    EXPECT_EQ(cfg2.getObsBrowserWidth(), 1024);
+    EXPECT_EQ(cfg2.getObsBrowserHeight(), 768);
+    EXPECT_EQ(cfg2.getObsEffectSymbols(), "★,✨,⚡");
+    EXPECT_EQ(cfg2.getObsEffectSize(), 25);
+    EXPECT_EQ(cfg2.getObsEffectCount(), 8);
 
     QFile::remove(configPath);
 }

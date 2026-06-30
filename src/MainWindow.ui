@@ -417,27 +417,97 @@
                  <property name="value"><number>30</number></property>
                 </widget>
                </item>
-               <item row="3" column="0" colspan="2">
-                <widget class="QLabel" name="lblObsPhysicsPreview">
-                 <property name="text">
-                  <string>サイズプレビュー: [ 50px 〜 150px ]</string>
-                 </property>
-                 <property name="alignment">
-                  <set>Qt::AlignCenter</set>
-                 </property>
-                 <property name="styleSheet">
-                  <string>color: gray; font-style: italic;</string>
-                 </property>
-                </widget>
-               </item>
-              </layout>
+                <item row="3" column="0">
+                 <widget class="QLabel" name="lblBrowserWidth">
+                  <property name="text">
+                   <string>OBS解像度 幅 (px):</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="3" column="1">
+                 <widget class="QSpinBox" name="spinObsBrowserWidth">
+                  <property name="minimum"><number>100</number></property>
+                  <property name="maximum"><number>7680</number></property>
+                  <property name="value"><number>800</number></property>
+                 </widget>
+                </item>
+                <item row="4" column="0">
+                 <widget class="QLabel" name="lblBrowserHeight">
+                  <property name="text">
+                   <string>OBS解像度 高さ (px):</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="4" column="1">
+                 <widget class="QSpinBox" name="spinObsBrowserHeight">
+                  <property name="minimum"><number>100</number></property>
+                  <property name="maximum"><number>4320</number></property>
+                  <property name="value"><number>600</number></property>
+                 </widget>
+                </item>
+                <item row="5" column="0">
+                 <widget class="QLabel" name="lblEffectSymbols">
+                  <property name="text">
+                   <string>エフェクト記号 (カンマ区切り):</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="5" column="1">
+                 <widget class="QLineEdit" name="editObsEffectSymbols">
+                  <property name="text">
+                   <string>♥,♦,♣,♠</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="6" column="0">
+                 <widget class="QLabel" name="lblEffectSize">
+                  <property name="text">
+                   <string>エフェクトサイズ (px):</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="6" column="1">
+                 <widget class="QSpinBox" name="spinObsEffectSize">
+                  <property name="minimum"><number>5</number></property>
+                  <property name="maximum"><number>100</number></property>
+                  <property name="value"><number>20</number></property>
+                 </widget>
+                </item>
+                <item row="7" column="0">
+                 <widget class="QLabel" name="lblEffectCount">
+                  <property name="text">
+                   <string>エフェクト放出量 (個):</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="7" column="1">
+                 <widget class="QSpinBox" name="spinObsEffectCount">
+                  <property name="minimum"><number>1</number></property>
+                  <property name="maximum"><number>50</number></property>
+                  <property name="value"><number>5</number></property>
+                 </widget>
+                </item>
+                <item row="8" column="0" colspan="2">
+                 <widget class="QLabel" name="lblObsPhysicsPreview">
+                  <property name="text">
+                   <string>サイズプレビュー: [ 50px 〜 150px ]</string>
+                  </property>
+                  <property name="alignment">
+                   <set>Qt::AlignCenter</set>
+                  </property>
+                  <property name="styleSheet">
+                   <string>color: gray; font-style: italic;</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
              </widget>
             </item><item>
-            <widget class="QCheckBox" name="chkObsWebSocket">
-             <property name="text"><string>OBSブラウザソース連携（WebSocketサーバー）を有効にする</string></property>
-            </widget>
-           </item>
-           <item><layout class="QHBoxLayout" name="horizontalLayoutObsUrl"><item><widget class="QLabel" name="labelObsUrl"><property name="text"><string>ブラウザソースURL:</string></property></widget></item><item><widget class="QLineEdit" name="editObsUrl"><property name="readOnly"><bool>true</bool></property><property name="text"><string>http://localhost:8080 (あるいは overlay.html を直接読み込み)</string></property></widget></item><item><widget class="QPushButton" name="btnCopyObsUrl"><property name="text"><string>URLコピー</string></property></widget></item></layout></item><item>
+             <widget class="QCheckBox" name="chkObsWebSocket">
+              <property name="text"><string>OBSブラウザソース連携（WebSocketサーバー）を有効にする</string></property>
+             </widget>
+            </item>
+            <item><layout class="QHBoxLayout" name="horizontalLayoutObsUrl"><item><widget class="QLabel" name="labelObsUrl"><property name="text"><string>ブラウザソースURL:</string></property></widget></item><item><widget class="QLineEdit" name="editObsUrl"><property name="readOnly"><bool>true</bool></property><property name="text"><string>http://localhost:8080 (あるいは overlay.html を直接読み込み)</string></property></widget></item><item><widget class="QPushButton" name="btnCopyObsUrl"><property name="text"><string>URLコピー</string></property></widget></item></layout></item><item>
             <widget class="QPushButton" name="btnSaveObs">
              <property name="text"><string>OBS設定を保存</string></property>
             </widget>
