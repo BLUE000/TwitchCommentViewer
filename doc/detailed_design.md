@@ -78,7 +78,23 @@
     - 保存ボタン `btnSaveTts`: アクティブなラジオボタンの状態に基づき、個別および共通設定を対象のTTSエンジン設定として `config.json` に保存。
 * **BOT除外設定**:
   - `editBotUsers` (QLineEdit): BOT判定するユーザー名のカンマ区切り入力欄。
-* 権利・ライセンス表記（TrustChain・Qt等のライセンスを記載）。
+* **OBS連携設定・物理アバター設定**:
+  - `groupBoxObs` (QGroupBox / トグルボタン `btnToggleObs` で開閉) 内に配置。
+  - `chkObsFileOutput` (QCheckBox): コメントをテキストファイルに出力する。
+  - `spinObsPort` (QSpinBox): HTTPサーバーポート（デフォルト：8081）。
+  - `comboObsOverlay` (QComboBox): 使用するオーバーレイHTMLファイル名を選択。
+  - `btnOpenOverlayFolder` (QPushButton): `assets/overlay/` フォルダをエクスプローラで開く。
+  - `chkObsWebSocket` (QCheckBox): OBSブラウザソース連携（WebSocketサーバー）を有効にする。
+  - `editObsUrl` (QLineEdit): ブラウザソースURL（読み取り専用、例：`http://localhost:8081/`）。
+  - `btnCopyObsUrl` (QPushButton): 上記のURLをクリップボードにコピー。
+  - `btnSaveObs` (QPushButton): 上記の設定を `config.json` に保存する。
+  - **物理アバターオーバーレイ設定領域**:
+    - `groupBoxObsPhysics` (QGroupBox): 物理アバターオーバーレイの調整パネル（`comboObsOverlay` で `overlay_physics.html` が選択されている時のみ表示制御）。
+    - `spinObsAvatarMinSize` (QSpinBox): アバターの最小サイズを設定（デフォルト 50 px）。
+    - `spinObsAvatarMaxSize` (QSpinBox): アバターの最大サイズを設定（デフォルト 150 px）。
+    - `spinObsBounceFactor` (QSpinBox): 地面衝突時の跳ね返りやすさを設定（0〜100%、デフォルト 30%）。
+    - `lblObsPhysicsPreview` (QLabel): 最小・最大サイズのピクセル設定に応じ、`サイズプレビュー: [ 50px 〜 150px ]` のように動的に表示を更新するラベル。
+* **権利・ライセンス表記（TrustChain・Qt等のライセンスを記載）。**
 
 ---
 
@@ -146,9 +162,14 @@
   - 棒読みちゃん用個別設定: Host, Port, Exe, Voice, Volume, Speed, Pitch
   - VOICEVOX用個別設定: Host, Port, Exe, Speaker, Volume, Speed, Pitch
   - 共通設定: `ttsAutoStart`（自動起動）、`ttsAutoStop`（自動終了）、`ttsIgnoreUsers`（除外ユーザー）
+  - OBS物理オーバーレイ設定: `obs_avatar_min_size`（最小サイズ, デフォルト 50）、`obs_avatar_max_size`（最大サイズ, デフォルト 150）、`obs_bounce_factor`（反発係数 %, デフォルト 30）
 * `saveToken(const QString& token)` / `loadToken()`: DPAPI / TransCipherを用いた暗号化トークンの保存とロード。
 * `getBotUsers()` / `setBotUsers(const QStringList& bots)`: BOT除外判定用リストの取得・更新。
 * `getTtsIgnoreUsers()` / `setTtsIgnoreUsers(const QStringList& users)`: 読み上げ無視ユーザーリストの取得・更新。
+* 物理設定 Getter/Setter:
+  - `getObsAvatarMinSize() const` / `setObsAvatarMinSize(int size)`
+  - `getObsAvatarMaxSize() const` / `setObsAvatarMaxSize(int size)`
+  - `getObsBounceFactor() const` / `setObsBounceFactor(int factor)`
 
 #### `ITtsIntegration`
 * 棒読みちゃんとVOICEVOXの連携を抽象化するインターフェースクラス。
@@ -165,6 +186,20 @@
 * `QNetworkAccessManager` を用いて、VOICEVOXローカルAPIに対して `/audio_query` を送信し、取得したクエリJSON内の `speedScale`、`pitchScale`、`volumeScale` などの値を `ConfigManager` の設定値で書き換え、`/synthesis` APIからWAV形式の音声データを受信。
 * 受信したWAVデータを Windows Win32 API `PlaySound` を使ってメモリから非同期再生する。
 * 読み上げ除外ユーザーの場合はAPIリクエストを行わず早期リターンする。
+
+#### `ObsHttpServer`
+* **機能**: OBS向けのHTML/JS/CSSファイルを配信する超軽量HTTPサーバー。
+* **セキュリティ対策（3層の防御壁）**:
+  1. **URLパス文字フィルタ**: リクエストされたURL（URLデコード前）が正規表現 `^[a-zA-Z0-9_\-\.\/]+$` にマッチするか検証。スペース、`%`、`:`、`\`、およびドット連続 `..` が含まれる場合はファイルアクセスを行わずに即座に `400 Bad Request` または `404 Not Found` を返す。
+  2. **物理パス絶対範囲検証**: ドキュメントルート（`assets/overlay`）とリクエストされた相対パスを連結し、`QFileInfo::canonicalFilePath()` で物理実絶対パスを算出。これがドキュメントルートの物理実絶対パスで始まっていること（`startsWith`）を検証し、違反している場合は `403 Forbidden` を返す。
+  3. **CSP（Content Security Policy）ヘッダーの強制適用**: 送出するHTTPヘッダーに以下を設定：
+     `Content-Security-Policy: default-src 'self' http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:*; img-src 'self' data: https://static-cdn.jtvnw.net; script-src 'self'; style-src 'self' 'unsafe-inline';`
+
+#### `ObsWebSocketServer`
+* **機能**: コメントイベントおよび管理画面からの座標同期イベントをブロードキャストする中継サーバー。
+* **メッセージリレー処理**:
+  - `processTextMessage(const QString& message)` において、受信したJSON形式のテキストメッセージを解析。
+  - アクションが `drag_start`, `drag_move`, `drag_end` などの管理側からの座標データである場合、**送信元のソケットを除く**すべての接続中のWebSocketクライアントへ無加工でデータをブロードキャスト転送する。
 
 ---
 
@@ -226,3 +261,71 @@
    - `targetStep <= 500`: 500
    - それ以上は、10の累乗倍を基準に `10^k`, `2 * 10^k`, `2.5 * 10^k`, `5 * 10^k` を判定。
 4. Y軸の表示範囲を `niceStep` の倍数に丸めて `[0, roundedMax]` とし、`tickCountY = roundedMax / niceStep + 1` を設定する。
+
+### 5.6 物理アバター座標同期シーケンス
+1. 管理画面（`overlay_control.html`）上でアバターがドラッグ開始された際、WebSocket経由で `drag_start` メッセージを送信。
+2. C++ `ObsWebSocketServer` が受信し、送信元以外の接続ソケット（表示画面 `overlay_physics.html`）へブロードキャスト。
+3. 表示画面側は、対象アバターの `isDragging` フラグを `true` にし、物理落下・バウンド演算を一時サスペンドする。
+4. 管理画面上でドラッグ移動中、WebSocket経由で `drag_move(x, y)` メッセージをリアルタイム送信。
+5. C++ `ObsWebSocketServer` が転送し、表示画面側のアバターの座標 `(x, y)` を直接更新する（描画のみ同期）。
+6. ドラッグが終了した際、WebSocket経由で `drag_end` メッセージを送信。
+7. C++ `ObsWebSocketServer` が転送し、表示画面側は `isDragging` フラグを `false` に戻す。アバターはドロップされた現在座標を初速度ゼロの起点として、物理落下を再開する。
+
+---
+
+## 6. OBS物理アバターオーバーレイアセット設計
+
+`assets/overlay/` ディレクトリ内に配置するHTML/JS/CSSアセットの内部モジュール詳細設計。
+
+### 6.1 物理表示画面 (`overlay_physics.html`)
+* **構成**: 各アバターを `div`（アバター画像 `img` とコメント吹き出し `div` を内包）としてDOM動的生成・管理する構成とする。
+* **物理ループ (自作 2D シミュレーション)**:
+  - `requestAnimationFrame` にて `updatePhysics()` ループを毎フレーム呼び出し。
+  - 各アバターオブジェクトのデータ構造：
+    ```javascript
+    {
+      userId: "string",
+      username: "string",
+      avatarUrl: "string",
+      element: HTMLElement,       // DOM要素への参照
+      bubbleElement: HTMLElement, // 吹き出しDOM要素への参照
+      x: number,                  // 現在位置 X (px)
+      y: number,                  // 現在位置 Y (px)
+      vy: number,                 // 垂直速度 (px/frame)
+      size: number,               // 現在のサイズ (px)
+      commentCount: number,       // 受信コメント数（成長判定用）
+      isDragging: boolean,        // ドラッグ同期フラグ
+      bubbleTimer: number         // 吹き出し消滅用タイマーID
+    }
+    ```
+  - **物理挙動パラメータ**:
+    - `gravity`: `0.5` px/frame²（重力加速度）
+    - `bounceFactor`: C++設定値から取得した反発係数（設定値が `30` の場合 `e = 0.3`）
+  - **更新処理**:
+    - `isDragging == true` のアバターは、座標更新を物理シミュレーション対象から除外。
+    - `isDragging == false` のアバターは、以下を実行：
+      1. 重力適用: `vy += gravity`
+      2. 座標更新: `y += vy`
+      3. 地面衝突検知:
+         `y + size >= windowHeight` に達した場合、`y = windowHeight - size` に位置修正し、速度を反転・減衰：`vy = -vy * (bounceFactor / 100)`。
+         ただし、`Math.abs(vy) < 0.2` になった場合は `vy = 0` とし、微小なバウンドの繰り返しによるフリーズ/無駄な計算を防ぐ（静止状態へ移行）。
+  - **直立固定**: CSS `transform: translate(x, y)` のみを用いてアバターを配置し、回転（`rotate`）を適用しないことで直立を維持する。
+
+### 6.2 プレビューおよびアバター成長ロジック
+* **初期スポーン**: 画面上端中央 `x = (windowWidth - size) / 2`, `y = 0`, `vy = 0` でアバターを生成。初期サイズは `ConfigManager` より取得した `obs_avatar_min_size`。
+* **成長判定**: 同一ユーザーからのコメント受信ごとに `commentCount` をインクリメント。サイズを `minSize + (commentCount * 10)` で拡張（上限は `obs_avatar_max_size`）。サイズ変更に合わせてDOM要素の幅・高さ、および物理境界判定の `size` を動的に更新する。
+* **吹き出し**: コメント受信時にアバターの頭上（`y - bubbleHeight`）に表示し、7秒後にフェードアウトアニメーション（CSSクラス追加）を適用してDOMから削除する。アバターの移動・落下に同期して位置を追従させる。
+
+### 6.3 セーフティガバナー（高負荷防止機構）
+* **アバター数制限**: アバター配列の要素数が **30** を超えた場合、配列先頭（最も古いアバター）を取得し、DOMからフェードアウト削除した上で配列から除去する。
+* **フレーム時間監視**:
+  - `updatePhysics()` 内の処理開始から終了までの時間を `performance.now()` で計測。
+  - 計算・描画処理時間が **10ms** を超えた場合、コンソールに警告ログを出力し、物理演算ループを一時停止（サスペンド状態）にする。再度安全な状態になるか、ユーザーによる管理画面からの操作が行われるまでサスペンド状態を維持し、ブラウザおよびOBSのフリーズを防止する。
+
+### 6.4 管理操作画面 (`overlay_control.html`)
+* **構成**: 現在出現中のアバターを配置し、ドラッグ可能にする座標空間表示。
+* **ドラッグ＆ドロップ実装**:
+  - `mousedown` / `mousemove` / `mouseup`（または HTML5 Drag and Drop API）を用いてアバター要素をドラッグ可能にする。
+  - ドラッグ開始時: WebSocket経由で `{ "action": "drag_start", "userId": "..." }` を送信。
+  - ドラッグ移動中: 移動先の絶対座標を計算し、`{ "action": "drag_move", "userId": "...", "x": x, "y": y }` を送信。
+  - ドラッグ終了時: `{ "action": "drag_end", "userId": "..." }` を送信。

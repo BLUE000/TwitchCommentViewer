@@ -279,6 +279,13 @@ void MainWindow::setConfigManager(ConfigManager* configManager) {
     loadOverlayFiles();
     int idx = ui->comboObsOverlay->findText(m_configManager->getObsOverlayFile());
     if (idx >= 0) ui->comboObsOverlay->setCurrentIndex(idx);
+
+    ui->spinObsAvatarMinSize->setValue(m_configManager->getObsAvatarMinSize());
+    ui->spinObsAvatarMaxSize->setValue(m_configManager->getObsAvatarMaxSize());
+    ui->spinObsBounceFactor->setValue(m_configManager->getObsBounceFactor());
+
+    updateObsPhysicsPreview();
+    on_comboObsOverlay_currentTextChanged(m_configManager->getObsOverlayFile());
         
     // OBSローカルのパスを生成してセットする (HTTP用)
     QString url = QString("http://localhost:%1/").arg(m_configManager->getObsServerPort());
@@ -378,6 +385,11 @@ void MainWindow::on_btnSaveObs_clicked() {
         m_configManager->setObsWebSocketEnabled(ui->chkObsWebSocket->isChecked());
         m_configManager->setObsServerPort(ui->spinObsPort->value());
         m_configManager->setObsOverlayFile(ui->comboObsOverlay->currentText());
+        
+        m_configManager->setObsAvatarMinSize(ui->spinObsAvatarMinSize->value());
+        m_configManager->setObsAvatarMaxSize(ui->spinObsAvatarMaxSize->value());
+        m_configManager->setObsBounceFactor(ui->spinObsBounceFactor->value());
+        
         m_configManager->saveConfig();
         
         QString url = QString("http://localhost:%1/").arg(ui->spinObsPort->value());
@@ -1393,4 +1405,46 @@ void MainWindow::handleStreamStatusChanged(bool online, qint64 activeSessionId) 
         showStatusMessage("配信の終了イベントを受信しました。セッションを終了します。");
     }
     refreshSessionsComboBox();
+}
+
+void MainWindow::on_comboObsOverlay_currentTextChanged(const QString& text) {
+    bool isPhysics = (text == "overlay_physics.html");
+    ui->groupBoxObsPhysics->setVisible(isPhysics);
+}
+
+void MainWindow::on_spinObsAvatarMinSize_valueChanged(int value) {
+    if (value > ui->spinObsAvatarMaxSize->value()) {
+        ui->spinObsAvatarMaxSize->setValue(value);
+    }
+    updateObsPhysicsPreview();
+}
+
+void MainWindow::on_spinObsAvatarMaxSize_valueChanged(int value) {
+    if (value < ui->spinObsAvatarMinSize->value()) {
+        ui->spinObsAvatarMinSize->setValue(value);
+    }
+    updateObsPhysicsPreview();
+}
+
+void MainWindow::on_spinObsBounceFactor_valueChanged(int value) {
+    Q_UNUSED(value);
+    updateObsPhysicsPreview();
+}
+
+void MainWindow::updateObsPhysicsPreview() {
+    int minSize = ui->spinObsAvatarMinSize->value();
+    int maxSize = ui->spinObsAvatarMaxSize->value();
+    int bounce = ui->spinObsBounceFactor->value();
+    ui->lblObsPhysicsPreview->setText(QString("サイズプレビュー: [ %1px 〜 %2px ]").arg(minSize).arg(maxSize));
+
+    // WebSocket経由で即時ブロードキャスト
+    if (m_controller && m_configManager && ui->comboObsOverlay->currentText() == "overlay_physics.html") {
+        QVariantMap payload;
+        payload["minSize"] = minSize;
+        payload["maxSize"] = maxSize;
+        payload["bounceFactor"] = bounce;
+        QMetaObject::invokeMethod(m_controller, "onBroadcastObsActionRequested", Qt::QueuedConnection,
+                                  Q_ARG(QString, "settings_changed"),
+                                  Q_ARG(QVariantMap, payload));
+    }
 }

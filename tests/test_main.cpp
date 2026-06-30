@@ -21,6 +21,7 @@ TEST(DatabaseManagerTest, EncryptionDecryptionReversibility) {
 
 #include "DatabaseManager.h"
 #include <QFile>
+#include <QDir>
 #include <QSqlQuery>
 #include <QVariant>
 
@@ -313,6 +314,88 @@ TEST(VoiceVoxIntegrationTest, QueryJsonRewrite) {
     EXPECT_DOUBLE_EQ(obj["speedScale"].toDouble(), 1.2);
     EXPECT_DOUBLE_EQ(obj["pitchScale"].toDouble(), 0.05);
     EXPECT_DOUBLE_EQ(obj["volumeScale"].toDouble(), 0.8);
+}
+
+#include "modules/ObsHttpServer.h"
+#include <QTcpSocket>
+#include <QThread>
+#include <QEventLoop>
+
+TEST(ConfigManagerTest, ObsPhysicsSettings) {
+    QString configPath = QCoreApplication::applicationDirPath() + "/config.json";
+    QFile::remove(configPath);
+
+    ConfigManager cfg;
+    cfg.setObsAvatarMinSize(70);
+    cfg.setObsAvatarMaxSize(180);
+    cfg.setObsBounceFactor(45);
+    cfg.saveConfig();
+
+    ConfigManager cfg2;
+    ASSERT_TRUE(cfg2.loadConfig());
+    EXPECT_EQ(cfg2.getObsAvatarMinSize(), 70);
+    EXPECT_EQ(cfg2.getObsAvatarMaxSize(), 180);
+    EXPECT_EQ(cfg2.getObsBounceFactor(), 45);
+
+    QFile::remove(configPath);
+}
+
+TEST(ObsHttpServerTest, SecurityFilters) {
+    ObsHttpServer server;
+    QString tempRoot = QCoreApplication::applicationDirPath() + "/test_assets";
+    QDir().mkpath(tempRoot);
+    server.setDocumentRoot(tempRoot);
+    server.setIndexFile("overlay.html");
+
+    QFile dummyFile(tempRoot + "/overlay.html");
+    ASSERT_TRUE(dummyFile.open(QIODevice::WriteOnly));
+    dummyFile.write("Hello Overlay");
+    dummyFile.close();
+
+    ASSERT_TRUE(server.listen(QHostAddress::LocalHost, 0));
+    quint16 port = server.serverPort();
+
+    auto sendRequest = [port](const QString& path) -> QByteArray {
+        QTcpSocket socket;
+        socket.connectToHost(QHostAddress::LocalHost, port);
+        if (!socket.waitForConnected(2000)) return "";
+
+        // イベントループを回してサーバーに接続を受け入れさせる
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+
+        socket.write(QString("GET %1 HTTP/1.1\r\nConnection: close\r\n\r\n").arg(path).toUtf8());
+        socket.flush();
+
+        // サーバーが処理しソケットを切断するまでイベントループを回して待つ
+        int limit = 100;
+        while (socket.state() == QAbstractSocket::ConnectedState && limit-- > 0) {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+            QThread::msleep(10);
+        }
+        
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+        return socket.readAll();
+    };
+
+    // Test 1: Valid request
+    QByteArray res1 = sendRequest("/overlay.html");
+    EXPECT_TRUE(res1.startsWith("HTTP/1.1 200 OK"));
+    EXPECT_TRUE(res1.contains("Content-Security-Policy"));
+    EXPECT_TRUE(res1.contains("Hello Overlay"));
+
+    // Test 2: Invalid characters in URL path (should be blocked by RegularExpression)
+    QByteArray res2 = sendRequest("/over lay.html");
+    EXPECT_TRUE(res2.startsWith("HTTP/1.1 404 Not Found") || res2.isEmpty());
+
+    QByteArray res3 = sendRequest("/overlay.html%00");
+    EXPECT_TRUE(res3.startsWith("HTTP/1.1 404 Not Found") || res3.isEmpty());
+
+    // Test 3: Directory traversal containing ".." (should be blocked by RegularExpression)
+    QByteArray res4 = sendRequest("/../CMakeLists.txt");
+    EXPECT_TRUE(res4.startsWith("HTTP/1.1 404 Not Found") || res4.isEmpty());
+
+    QFile::remove(tempRoot + "/overlay.html");
+    QDir().rmdir(tempRoot);
 }
 
 #include <QCoreApplication>

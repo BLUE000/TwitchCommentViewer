@@ -50,6 +50,11 @@ private slots:
     void on_btnSaveObs_clicked();
     void on_btnCopyObsUrl_clicked();
     void on_btnOpenOverlayFolder_clicked();
+    void on_comboObsOverlay_currentTextChanged(const QString& text);
+    void on_spinObsAvatarMinSize_valueChanged(int value);
+    void on_spinObsAvatarMaxSize_valueChanged(int value);
+    void on_spinObsBounceFactor_valueChanged(int value);
+    void updateObsPhysicsPreview();
     
     void on_btnToggleTts_toggled(bool checked);
     void on_btnToggleObs_toggled(bool checked);

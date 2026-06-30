@@ -50,6 +50,16 @@
 | UT-TTS-04 | VoiceVoxIntegrationImpl クエリ書換え | `/audio_query` から返却されるダミーJSONデータに対して、設定した音量（Volume）、速度（Speed）、音程（Pitch）を適用する。 | 1. JSON内の `speedScale`、`pitchScale`、`volumeScale` が指定された浮動小数点数（例: speedScale=1.2, pitchScale=0.05, volumeScale=0.8）に正しく書き換えられていること。 | 未実装 |
 | UT-TTS-05 | VoiceVoxIntegrationImpl APIリクエスト | テキスト送信メソッドを実行する。 | 1. `/audio_query` をPOSTし、得られたレスポンスを `/synthesis` へPOSTするHTTPリクエストが正しく構築されること。 | 未実装 |
 
+### 2.6 OBS連携・セキュリティ・物理オーバーレイ
+| 試験ID | 対象関数/処理 | 入力条件 | 期待する結果（判定基準） | 実装状況 |
+|---|---|---|---|---|
+| UT-OBS-01 | ConfigManager物理設定保存 | ConfigManagerに物理設定値（MinSize=80, MaxSize=200, BounceFactor=45）を設定して `saveConfig()` を実行。 | `config.json` に正しく保存され、`loadConfig()` 後に同じ値が復元されること。 | 未実装 |
+| UT-OBS-02 | ObsHttpServer URLフィルタ | リクエストパスに「スペース」「%」「:」「\」「..」などを含む不正なGETリクエストを送信する。 | ファイルオープン処理に入らず、即座に 400 Bad Request または 404 Not Found 応答を返すこと。 | 未実装 |
+| UT-OBS-03 | ObsHttpServer 実パス範囲検証 | 相対パス解決後に実絶対パスが `assets/overlay/` ディレクトリ配下からはみ出るリクエスト（`/../CMakeLists.txt` 等）を送信する。 | 403 Forbidden 応答が返され、対象ファイルの内容が読み込まれないこと。 | 未実装 |
+| UT-OBS-04 | ObsHttpServer CSPヘッダー付与 | 正常なファイルをリクエストする。 | レスポンスヘッダーに `Content-Security-Policy` が含まれ、自己ホストおよび指定外部ドメイン以外を制限していること。 | 未実装 |
+| UT-OBS-05 | ObsWebSocketServer メッセージリレー | 接続されたソケットAから `{ "action": "drag_move", ... }` を送信する。 | 送信元ソケットAにはエコーバックされず、接続中の他のソケットBにのみデータが転送されること。 | 未実装 |
+
 ## 3. テストの実行と判定基準
 * すべてのテストケースは `ctest` コマンド等により一括実行可能であること。
 * 単体テストのカバレッジは、コアロジック（`DatabaseManager`, `CommentAnalyzer` 等）において80%以上を目標とする。
+

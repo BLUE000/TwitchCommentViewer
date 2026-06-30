@@ -5,6 +5,7 @@
 #include <QMimeDatabase>
 #include <QCoreApplication>
 #include <QDebug>
+#include <QRegularExpression>
 
 ObsHttpServer::ObsHttpServer(QObject* parent) 
     : QTcpServer(parent)
@@ -44,19 +45,42 @@ void ObsHttpServer::onReadyRead() {
         QStringList tokens = requestLine.split(' ');
         if (tokens.size() >= 2 && tokens[0] == "GET") {
             QString path = tokens[1];
+
+            // 第1の壁: URLパス文字フィルタ (許可文字以外、または連続ドットは即座に拒否)
+            QRegularExpression allowedPattern("^[a-zA-Z0-9_\\-\\./]+$");
+            if (!allowedPattern.match(path).hasMatch() || path.contains("..")) {
+                sendNotFound(socket);
+                return;
+            }
             
             // ルートパスへのアクセスは設定されたインデックスファイルにルーティング
             if (path == "/" || path.isEmpty()) {
                 path = "/" + m_indexFile;
             }
 
-            // ディレクトリトラバーサル防止の簡易チェック
-            if (path.contains("..")) {
+            // 第2の壁: canonicalFilePath検証による物理実絶対パスの範囲チェック
+            QString absoluteFilePath = m_documentRoot + path;
+            QFileInfo fileInfo(absoluteFilePath);
+            if (!fileInfo.exists()) {
                 sendNotFound(socket);
                 return;
             }
 
-            QString absoluteFilePath = m_documentRoot + path;
+            QString canonicalRoot = QDir(m_documentRoot).canonicalPath();
+            QString canonicalFile = fileInfo.canonicalFilePath();
+            
+            // Windows環境では大文字小文字を区別しないファイルシステムに対応するため、大文字小文字無視で比較する
+#ifdef Q_OS_WIN
+            bool isInside = canonicalFile.startsWith(canonicalRoot, Qt::CaseInsensitive);
+#else
+            bool isInside = canonicalFile.startsWith(canonicalRoot);
+#endif
+
+            if (canonicalFile.isEmpty() || !isInside) {
+                sendForbidden(socket);
+                return;
+            }
+
             sendResponse(socket, absoluteFilePath);
         }
     }
@@ -82,6 +106,8 @@ void ObsHttpServer::sendResponse(QTcpSocket* socket, const QString& filePath) {
     response.append("HTTP/1.1 200 OK\r\n");
     response.append("Content-Type: " + contentType.toUtf8() + "\r\n");
     response.append("Content-Length: " + QByteArray::number(content.size()) + "\r\n");
+    // 第3の壁: CSP（Content-Security-Policy）ヘッダーの強制適用
+    response.append("Content-Security-Policy: default-src 'self' http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:*; img-src 'self' data: https://static-cdn.jtvnw.net; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';\r\n");
     response.append("Connection: close\r\n\r\n");
     response.append(content);
 
@@ -95,6 +121,16 @@ void ObsHttpServer::sendNotFound(QTcpSocket* socket) {
                           "Content-Type: text/plain\r\n"
                           "Connection: close\r\n\r\n"
                           "404 Not Found";
+    socket->write(response);
+    socket->flush();
+    socket->disconnectFromHost();
+}
+
+void ObsHttpServer::sendForbidden(QTcpSocket* socket) {
+    QByteArray response = "HTTP/1.1 403 Forbidden\r\n"
+                          "Content-Type: text/plain\r\n"
+                          "Connection: close\r\n\r\n"
+                          "403 Forbidden";
     socket->write(response);
     socket->flush();
     socket->disconnectFromHost();

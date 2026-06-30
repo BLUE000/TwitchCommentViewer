@@ -107,6 +107,21 @@ bool ConfigManager::loadConfig() {
     if (json.contains("obs_overlay_file")) {
         m_obsOverlayFile = json["obs_overlay_file"].toString("overlay.html");
     }
+    if (json.contains("obs_avatar_min_size")) {
+        m_obsAvatarMinSize = json["obs_avatar_min_size"].toInt(50);
+    } else {
+        m_obsAvatarMinSize = 50;
+    }
+    if (json.contains("obs_avatar_max_size")) {
+        m_obsAvatarMaxSize = json["obs_avatar_max_size"].toInt(150);
+    } else {
+        m_obsAvatarMaxSize = 150;
+    }
+    if (json.contains("obs_bounce_factor")) {
+        m_obsBounceFactor = json["obs_bounce_factor"].toInt(30);
+    } else {
+        m_obsBounceFactor = 30;
+    }
 
     if (json.contains("bot_users") && json["bot_users"].isArray()) {
         QJsonArray botArray = json["bot_users"].toArray();
@@ -187,6 +202,9 @@ void ConfigManager::saveConfig() {
     rootObj["obs_websocket"] = m_obsWebSocketEnabled;
     rootObj["obs_server_port"] = m_obsServerPort;
     rootObj["obs_overlay_file"] = m_obsOverlayFile;
+    rootObj["obs_avatar_min_size"] = m_obsAvatarMinSize;
+    rootObj["obs_avatar_max_size"] = m_obsAvatarMaxSize;
+    rootObj["obs_bounce_factor"] = m_obsBounceFactor;
 
     QJsonArray botArray;
     for (const QString& bot : m_botUsers) {
@@ -386,6 +404,30 @@ QString ConfigManager::getObsOverlayFile() const {
 
 void ConfigManager::setObsOverlayFile(const QString& filename) {
     m_obsOverlayFile = filename;
+}
+
+int ConfigManager::getObsAvatarMinSize() const {
+    return m_obsAvatarMinSize;
+}
+
+void ConfigManager::setObsAvatarMinSize(int size) {
+    m_obsAvatarMinSize = size;
+}
+
+int ConfigManager::getObsAvatarMaxSize() const {
+    return m_obsAvatarMaxSize;
+}
+
+void ConfigManager::setObsAvatarMaxSize(int size) {
+    m_obsAvatarMaxSize = size;
+}
+
+int ConfigManager::getObsBounceFactor() const {
+    return m_obsBounceFactor;
+}
+
+void ConfigManager::setObsBounceFactor(int factor) {
+    m_obsBounceFactor = factor;
 }
 
 QStringList ConfigManager::getBotUsers() const {

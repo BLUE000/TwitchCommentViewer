@@ -29,8 +29,24 @@ void ObsWebSocketServer::onNewConnection() {
 }
 
 void ObsWebSocketServer::processTextMessage(const QString& message) {
-    // クライアントからのメッセージは基本受け取らないが、将来的な双方向通信用にプレースホルダ
-    qDebug() << "Message received from OBS:" << message;
+    QWebSocket* pSender = qobject_cast<QWebSocket*>(sender());
+    if (!pSender) return;
+
+    // JSONをパースしてアクション名を確認
+    QJsonDocument doc = QJsonDocument::fromJson(message.toUtf8());
+    if (doc.isObject()) {
+        QJsonObject obj = doc.object();
+        QString action = obj["action"].toString();
+        
+        // ドラッグ座標同期、または設定同期イベントの場合、送信元を除く全クライアントに転送
+        if (action == "drag_start" || action == "drag_move" || action == "drag_end" || action == "settings_changed") {
+            for (QWebSocket* pClient : std::as_const(m_clients)) {
+                if (pClient != pSender) {
+                    pClient->sendTextMessage(message);
+                }
+            }
+        }
+    }
 }
 
 void ObsWebSocketServer::socketDisconnected() {

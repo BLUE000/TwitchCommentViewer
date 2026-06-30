@@ -48,6 +48,7 @@ public slots:
     void onPinCommentRequested(const QString& messageId, int durationSeconds);
     void onUnpinCommentRequested(const QString& messageId);
     void onSendAnnouncementRequested(const QString& message, const QString& color);
+    void onBroadcastObsActionRequested(const QString& actionType, const QVariantMap& payload);
 
 protected:
     // シグナルの代わりにEvent割り込みで処理を受け取る

@@ -17,6 +17,8 @@ add_executable(UnitTests
     ${CMAKE_SOURCE_DIR}/src/modules/ConfigManager.cpp
     ${CMAKE_SOURCE_DIR}/src/modules/VoiceVoxIntegrationImpl.cpp
     ${CMAKE_SOURCE_DIR}/src/modules/VoiceVoxIntegrationImpl.h
+    ${CMAKE_SOURCE_DIR}/src/modules/ObsHttpServer.cpp
+    ${CMAKE_SOURCE_DIR}/src/modules/ObsHttpServer.h
 )
 
 target_include_directories(UnitTests PRIVATE 

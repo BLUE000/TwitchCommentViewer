@@ -24,6 +24,7 @@ private slots:
 private:
     void sendResponse(QTcpSocket* socket, const QString& filePath);
     void sendNotFound(QTcpSocket* socket);
+    void sendForbidden(QTcpSocket* socket);
 
     QString m_documentRoot;
     QString m_indexFile;

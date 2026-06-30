@@ -91,6 +91,13 @@ public:
     QString getObsOverlayFile() const;
     void setObsOverlayFile(const QString& filename);
 
+    int getObsAvatarMinSize() const;
+    void setObsAvatarMinSize(int size);
+    int getObsAvatarMaxSize() const;
+    void setObsAvatarMaxSize(int size);
+    int getObsBounceFactor() const;
+    void setObsBounceFactor(int factor);
+
     // ボットユーザー設定
     QStringList getBotUsers() const;
     void setBotUsers(const QStringList& bots);
@@ -149,6 +156,9 @@ private:
     bool m_obsWebSocketEnabled = false;
     int m_obsServerPort = 8081;
     QString m_obsOverlayFile = "overlay.html";
+    int m_obsAvatarMinSize = 50;
+    int m_obsAvatarMaxSize = 150;
+    int m_obsBounceFactor = 30;
 
     QStringList m_botUsers;
     QStringList m_ttsIgnoreUsers;

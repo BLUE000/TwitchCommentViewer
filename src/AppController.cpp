@@ -606,3 +606,9 @@ void AppController::reloadTtsIntegration() {
     }
 }
 
+void AppController::onBroadcastObsActionRequested(const QString& actionType, const QVariantMap& payload) {
+    if (m_obsWsIntegration) {
+        m_obsWsIntegration->sendAction(actionType, payload);
+    }
+}
+

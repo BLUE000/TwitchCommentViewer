@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>OBS Physics Avatar Overlay</title>
+    <link rel="stylesheet" href="style_physics.css">
+</head>
+<body>
+    <div id="container"></div>
+
+    <script>
+        let wsPort = 8082; // デフォルトのフォールバック
+        if (window.location.port) {
+            wsPort = parseInt(window.location.port) + 1;
+        }
+
+        console.log(`Connecting to WebSocket on port ${wsPort}...`);
+        const ws = new WebSocket('ws://localhost:' + wsPort);
+
+        let minSize = 50;
+        let maxSize = 150;
+        let bounceFactor = 30; // % 単位 (e.g. 30 = e:0.3)
+        const gravity = 0.5;
+        let avatars = [];
+        let isSuspended = false;
+
+        const defaultAvatar = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%236441a5"/><text x="50%" y="65%" font-size="40" font-family="Outfit" font-weight="bold" fill="white" text-anchor="middle">💬</text></svg>';
+
+        ws.onopen = () => {
+            console.log('Connected to OBS WebSocket Server');
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+
+            if (data.action === 'comment') {
+                handleComment(data.username, data.message, data.avatarUrl);
+            } else if (data.action === 'settings_changed') {
+                minSize = data.minSize || 50;
+                maxSize = data.maxSize || 150;
+                bounceFactor = data.bounceFactor !== undefined ? data.bounceFactor : 30;
+                console.log(`Settings updated: Min=${minSize}, Max=${maxSize}, Bounce=${bounceFactor}`);
+                applySettings();
+            } else if (data.action === 'drag_start') {
+                setDragging(data.userId, true);
+            } else if (data.action === 'drag_move') {
+                moveAvatar(data.userId, data.x, data.y);
+            } else if (data.action === 'drag_end') {
+                setDragging(data.userId, false);
+            }
+        };
+
+        function handleComment(username, message, avatarUrl) {
+            const userId = username.toLowerCase(); // 簡易的な一意のユーザーID
+            let av = avatars.find(a => a.userId === userId);
+
+            if (av) {
+                // 既存アバターの成長と吹き出し更新
+                av.commentCount++;
+                av.size = Math.min(maxSize, minSize + av.commentCount * 10);
+                av.element.style.width = `${av.size}px`;
+                av.element.style.height = `${av.size}px`;
+
+                // 吹き出し表示
+                showBubble(av, username, message);
+            } else {
+                // 新規アバター作成
+                const container = document.getElementById('container');
+                const avDiv = document.createElement('div');
+                avDiv.className = 'avatar-container';
+                avDiv.style.width = `${minSize}px`;
+                avDiv.style.height = `${minSize}px`;
+
+                const img = document.createElement('img');
+                img.className = 'avatar-image';
+                img.src = avatarUrl || defaultAvatar;
+                avDiv.appendChild(img);
+
+                container.appendChild(avDiv);
+
+                const windowWidth = window.innerWidth;
+                const size = minSize;
+
+                av = {
+                    userId: userId,
+                    username: username,
+                    avatarUrl: avatarUrl || defaultAvatar,
+                    element: avDiv,
+                    bubbleElement: null,
+                    x: (windowWidth - size) / 2,
+                    y: 0,
+                    vy: 0,
+                    size: size,
+                    commentCount: 1,
+                    isDragging: false,
+                    bubbleTimer: null
+                };
+
+                // 初期配置
+                avDiv.style.transform = `translate(${av.x}px, ${av.y}px)`;
+                avatars.push(av);
+
+                showBubble(av, username, message);
+
+                // アバター上限（最大30人）監視
+                if (avatars.length > 30) {
+                    const oldest = avatars.shift();
+                    oldest.element.classList.add('fade-out');
+                    setTimeout(() => {
+                        if (oldest.element.parentNode) {
+                            oldest.element.parentNode.removeChild(oldest.element);
+                        }
+                    }, 500);
+                }
+            }
+        }
+
+        function showBubble(av, username, message) {
+            // 既存の吹き出しがあれば消去
+            if (av.bubbleElement) {
+                if (av.bubbleElement.parentNode) {
+                    av.bubbleElement.parentNode.removeChild(av.bubbleElement);
+                }
+                clearTimeout(av.bubbleTimer);
+            }
+
+            // 吹き出し要素の作成
+            const bubble = document.createElement('div');
+            bubble.className = 'comment-bubble';
+            
+            const userDiv = document.createElement('div');
+            userDiv.className = 'comment-user';
+            userDiv.textContent = username;
+            bubble.appendChild(userDiv);
+
+            const textDiv = document.createElement('div');
+            textDiv.className = 'comment-text';
+            textDiv.textContent = message;
+            bubble.appendChild(textDiv);
+
+            av.element.appendChild(bubble);
+            av.bubbleElement = bubble;
+
+            // 7秒後にフェードアウトして消滅させる
+            av.bubbleTimer = setTimeout(() => {
+                bubble.classList.add('fade-out');
+                setTimeout(() => {
+                    if (bubble.parentNode) {
+                        bubble.parentNode.removeChild(bubble);
+                    }
+                    if (av.bubbleElement === bubble) {
+                        av.bubbleElement = null;
+                    }
+                }, 500);
+            }, 7000);
+        }
+
+        function setDragging(userId, isDragging) {
+            const av = avatars.find(a => a.userId === userId.toLowerCase());
+            if (av) {
+                av.isDragging = isDragging;
+                if (isDragging) {
+                    av.vy = 0;
+                }
+            }
+        }
+
+        function moveAvatar(userId, x, y) {
+            const av = avatars.find(a => a.userId === userId.toLowerCase());
+            if (av) {
+                av.x = x;
+                av.y = y;
+                av.element.style.transform = `translate(${av.x}px, ${av.y}px)`;
+            }
+        }
+
+        function applySettings() {
+            // 現在出現中の全アバターのサイズ更新を適用
+            avatars.forEach(av => {
+                av.size = Math.min(maxSize, minSize + av.commentCount * 10);
+                av.element.style.width = `${av.size}px`;
+                av.element.style.height = `${av.size}px`;
+            });
+        }
+
+        // 物理ループシミュレーション (1フレームごとに呼び出し)
+        function updatePhysics() {
+            if (isSuspended) return;
+
+            const startTime = performance.now();
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+
+            for (let i = 0; i < avatars.length; i++) {
+                const av = avatars[i];
+                if (av.isDragging) continue;
+
+                // 自由落下
+                av.vy += gravity;
+                av.y += av.vy;
+
+                // 地面バウンド衝突判定
+                if (av.y + av.size >= windowHeight) {
+                    av.y = windowHeight - av.size;
+                    av.vy = -av.vy * (bounceFactor / 100);
+
+                    // 微小なバウンドは停止させる
+                    if (Math.abs(av.vy) < 0.2) {
+                        av.vy = 0;
+                    }
+                }
+
+                // 横方向のはみ出し補正
+                if (av.x < 0) av.x = 0;
+                if (av.x + av.size > windowWidth) av.x = windowWidth - av.size;
+
+                // DOM位置更新 (回転角0度固定)
+                av.element.style.transform = `translate(${av.x}px, ${av.y}px)`;
+            }
+
+            // 計算時間監視によるフリーズ防止 (セーフティガバナー)
+            const duration = performance.now() - startTime;
+            if (duration > 10) {
+                console.warn(`Physics loop took ${duration}ms (Threshold 10ms exceeded). Suspending to prevent OBS crash.`);
+                isSuspended = true;
+
+                const warnDiv = document.createElement('div');
+                warnDiv.style.cssText = "position: absolute; top: 10px; left: 10px; color: %23ff4500; font-weight: bold; background: rgba(255, 255, 255, 0.9); border: 2px solid %23ff4500; border-radius: 8px; padding: 8px 12px; font-family: Outfit, sans-serif; box-shadow: 0 4px 10px rgba(0,0,0,0.2);";
+                warnDiv.textContent = "⚠️ High Compute Load Detected. Physics Simulation Suspended.";
+                document.body.appendChild(warnDiv);
+            } else {
+                requestAnimationFrame(updatePhysics);
+            }
+        }
+
+        requestAnimationFrame(updatePhysics);
+    </script>
+</body>
+</html>
