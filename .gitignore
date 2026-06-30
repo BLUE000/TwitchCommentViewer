@@ -36,6 +36,10 @@ trustchain_credentials.cmake
 *.log
 *.sqlite
 *.db
-WIP_STATE.md
 *.py
 release_package/
+
+# Local Development
+DecisionLog/
+.ai_rules.md
+WIP_STATE.md
