@@ -182,6 +182,15 @@
                 avDiv.style.transform = `translate(${av.x}px, ${av.y}px)`;
                 avatars.push(av);
 
+                // ダブルクリックイベント (OBSインタラクト等で直接クリックされたらエフェクト表示＆同期)
+                avDiv.addEventListener('dblclick', () => {
+                    ws.send(JSON.stringify({
+                        action: 'double_click',
+                        userId: av.userId
+                    }));
+                    createParticles(av.x + av.size / 2, av.y + av.size / 2);
+                });
+
                 showBubble(av, username, message);
 
                 // アバター上限（最大30人）監視
