@@ -68,6 +68,18 @@
                 if (av) {
                     createParticles(av.x + av.size / 2, av.y + av.size / 2);
                 }
+            } else if (data.action === 'update_avatar') {
+                const userId = (data.userId || "").trim().toLowerCase();
+                const avatarUrl = data.avatarUrl;
+                
+                const av = avatars.find(a => a.userId === userId);
+                if (av && avatarUrl) {
+                    av.avatarUrl = avatarUrl;
+                    const img = av.element.querySelector('.avatar-image');
+                    if (img) {
+                        img.src = avatarUrl;
+                    }
+                }
             }
         };
 
@@ -76,6 +88,15 @@
             let av = avatars.find(a => a.userId === userId);
 
             if (av) {
+                // 画像URLが途中で確定した（あるいは新しいURLになった）場合は上書き更新
+                if (avatarUrl && av.avatarUrl !== avatarUrl) {
+                    av.avatarUrl = avatarUrl;
+                    const img = av.element.querySelector('.avatar-image');
+                    if (img) {
+                        img.src = avatarUrl;
+                    }
+                }
+
                 // 既存アバターの成長と吹き出し更新
                 av.commentCount++;
                 av.size = Math.min(maxSize, minSize + av.commentCount * 10);

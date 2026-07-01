@@ -518,6 +518,15 @@ void AppController::fetchAvatar(const QString& userId) {
                     if (!imgUrl.isEmpty()) {
                         m_avatarUrlCache[userId] = imgUrl;
                         downloadAvatarImage(userId, imgUrl);
+                        
+                        // アバター画像URLが非同期で取得できたことをOBS側にWebSocketでリアルタイム通知
+                        QVariantMap updatePayload;
+                        updatePayload["userId"] = userId;
+                        updatePayload["avatarUrl"] = imgUrl;
+                        if (m_configManager && m_configManager->getObsWebSocketEnabled() && m_obsWsIntegration) {
+                            m_obsWsIntegration->sendAction("update_avatar", updatePayload);
+                        }
+
                         reply->deleteLater();
                         return; // successfully went to download
                     }
