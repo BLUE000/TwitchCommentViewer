@@ -69,10 +69,10 @@
                     createParticles(av.x + av.size / 2, av.y + av.size / 2);
                 }
             } else if (data.action === 'update_avatar') {
-                const userId = (data.userId || "").trim().toLowerCase();
+                const username = (data.username || "").trim().toLowerCase();
                 const avatarUrl = data.avatarUrl;
                 
-                const av = avatars.find(a => a.userId === userId);
+                const av = avatars.find(a => a.userId === username);
                 if (av && avatarUrl) {
                     av.avatarUrl = avatarUrl;
                     const img = av.element.querySelector('.avatar-image');
