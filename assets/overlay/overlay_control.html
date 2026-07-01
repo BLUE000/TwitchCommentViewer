@@ -82,6 +82,15 @@
         let scale = 1.0;
         let avatars = [];
         let activeDraggedAvatar = null;
+
+        function getDeterministicRandom(str) {
+            let hash = 2166136261;
+            for (let i = 0; i < str.length; i++) {
+                hash ^= str.charCodeAt(i);
+                hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+            }
+            return (hash >>> 0) / 4294967295;
+        }
         let dragOffsetX = 0;
         let dragOffsetY = 0;
 
@@ -165,12 +174,16 @@
 
                 const size = minSize;
 
+                // 重複防止のための決定論的スポーン座標Xの算出
+                const rp = getDeterministicRandom(userId);
+                const spawnX = (obsBrowserWidth - size) * (0.2 + 0.6 * rp);
+
                 av = {
                     userId: userId,
                     username: username,
                     avatarUrl: avatarUrl || defaultAvatar,
                     element: avDiv,
-                    x: (obsBrowserWidth - size) / 2,
+                    x: spawnX,
                     y: 50,
                     size: size,
                     commentCount: 1

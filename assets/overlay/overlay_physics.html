@@ -24,6 +24,15 @@
         let avatars = [];
         let isSuspended = false;
 
+        function getDeterministicRandom(str) {
+            let hash = 2166136261;
+            for (let i = 0; i < str.length; i++) {
+                hash ^= str.charCodeAt(i);
+                hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+            }
+            return (hash >>> 0) / 4294967295;
+        }
+
         const defaultAvatar = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%236441a5"/><text x="50%" y="65%" font-size="40" font-family="Outfit" font-weight="bold" fill="white" text-anchor="middle">💬</text></svg>';
 
         ws.onopen = () => {
@@ -93,14 +102,54 @@
                 const windowWidth = window.innerWidth;
                 const size = minSize;
 
+                // 完全ランダムかつ既存アバターと衝突しない位置（重なりNG）を探索
+                let spawnX = 0;
+                let attempts = 0;
+                let validPos = false;
+
+                while (!validPos && attempts < 100) {
+                    attempts++;
+                    // 画面の左右端からはみ出さないランダムX座標
+                    spawnX = Math.random() * (windowWidth - size);
+                    validPos = true;
+
+                    // 既存のすべてのアバターと当たり判定を行い、重なる場合は再探索
+                    for (let i = 0; i < avatars.length; i++) {
+                        const other = avatars[i];
+                        const rA = size / 2;
+                        const rB = other.size / 2;
+                        const cAx = spawnX + rA;
+                        const cAy = 0 + rA; // スポーン初期Yは0
+                        const cBx = other.x + rB;
+                        const cBy = other.y + rB;
+
+                        const dx = cBx - cAx;
+                        const dy = cBy - cAy;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        const minDist = rA + rB;
+
+                        // わずかな重なりも防ぐため、2pxの安全マージンを持たせる
+                        if (distance < (minDist + 2)) {
+                            validPos = false;
+                            break;
+                        }
+                    }
+                }
+
+                // 万が一100回探しても見つからなかった場合は完全ランダムに配置
+                if (!validPos) {
+                    spawnX = Math.random() * (windowWidth - size);
+                }
+
                 av = {
                     userId: userId,
                     username: username,
                     avatarUrl: avatarUrl || defaultAvatar,
                     element: avDiv,
                     bubbleElement: null,
-                    x: (windowWidth - size) / 2,
+                    x: spawnX,
                     y: 0,
+                    vx: 0,
                     vy: 0,
                     size: size,
                     commentCount: 1,
@@ -198,30 +247,123 @@
             const windowWidth = window.innerWidth;
             const windowHeight = window.innerHeight;
 
+            // 1. 各アバターの移動と壁・地面衝突
             for (let i = 0; i < avatars.length; i++) {
                 const av = avatars[i];
                 if (av.isDragging) continue;
 
-                // 自由落下
+                // 自由落下と水平移動
                 av.vy += gravity;
+                av.x += av.vx || 0;
                 av.y += av.vy;
 
                 // 地面バウンド衝突判定
                 if (av.y + av.size >= windowHeight) {
                     av.y = windowHeight - av.size;
                     av.vy = -av.vy * (bounceFactor / 100);
+                    // 地面摩擦
+                    if (av.vx) av.vx *= 0.9;
 
                     // 微小なバウンドは停止させる
                     if (Math.abs(av.vy) < 0.2) {
                         av.vy = 0;
                     }
+                    if (Math.abs(av.vx) < 0.1) {
+                        av.vx = 0;
+                    }
                 }
 
-                // 横方向のはみ出し補正
-                if (av.x < 0) av.x = 0;
-                if (av.x + av.size > windowWidth) av.x = windowWidth - av.size;
+                // 壁バウンド衝突判定
+                if (av.x < 0) {
+                    av.x = 0;
+                    av.vx = - (av.vx || 0) * (bounceFactor / 100);
+                } else if (av.x + av.size > windowWidth) {
+                    av.x = windowWidth - av.size;
+                    av.vx = - (av.vx || 0) * (bounceFactor / 100);
+                }
 
                 // DOM位置更新 (回転角0度固定)
+                av.element.style.transform = `translate(${av.x}px, ${av.y}px)`;
+            }
+
+            // 2. アバター同士の衝突判定と応答 (円形当たり判定)
+            for (let i = 0; i < avatars.length; i++) {
+                for (let j = i + 1; j < avatars.length; j++) {
+                    const a = avatars[i];
+                    const b = avatars[j];
+
+                    if (a.isDragging && b.isDragging) continue;
+
+                    const rA = a.size / 2;
+                    const rB = b.size / 2;
+                    const cAx = a.x + rA;
+                    const cAy = a.y + rA;
+                    const cBx = b.x + rB;
+                    const cBy = b.y + rB;
+
+                    const dx = cBx - cAx;
+                    const dy = cBy - cAy;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const minDist = rA + rB;
+
+                    if (distance < minDist) {
+                        // 衝突法線
+                        const nx = dx / (distance || 1);
+                        const ny = dy / (distance || 1);
+
+                        // めり込み解決 (位置の押し戻し)
+                        const overlap = minDist - distance;
+
+                        if (a.isDragging) {
+                            b.x += nx * overlap;
+                            b.y += ny * overlap;
+                        } else if (b.isDragging) {
+                            a.x -= nx * overlap;
+                            a.y -= ny * overlap;
+                        } else {
+                            // 等分で押し戻し
+                            a.x -= nx * overlap * 0.5;
+                            a.y -= ny * overlap * 0.5;
+                            b.x += nx * overlap * 0.5;
+                            b.y += ny * overlap * 0.5;
+                        }
+
+                        // 相対速度
+                        const rvx = (b.vx || 0) - (a.vx || 0);
+                        const rvy = (b.vy || 0) - (a.vy || 0);
+
+                        // 法線方向の相対速度
+                        const velAlongNormal = rvx * nx + rvy * ny;
+
+                        // 接近している場合のみ弾き合い処理
+                        if (velAlongNormal < 0) {
+                            const e = bounceFactor / 100;
+
+                            // 質量をサイズに比例させる (サイズが大きいほど質量が大きい)
+                            const massA = a.isDragging ? 100000000 : a.size;
+                            const massB = b.isDragging ? 100000000 : b.size;
+
+                            const invMassA = a.isDragging ? 0 : 1 / massA;
+                            const invMassB = b.isDragging ? 0 : 1 / massB;
+
+                            const impulseScalar = -(1 + e) * velAlongNormal / (invMassA + invMassB);
+
+                            if (!a.isDragging) {
+                                a.vx -= impulseScalar * invMassA * nx;
+                                a.vy -= impulseScalar * invMassA * ny;
+                            }
+                            if (!b.isDragging) {
+                                b.vx += impulseScalar * invMassB * nx;
+                                b.vy += impulseScalar * invMassB * ny;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 位置が補正された後の DOM 要素位置の再更新
+            for (let i = 0; i < avatars.length; i++) {
+                const av = avatars[i];
                 av.element.style.transform = `translate(${av.x}px, ${av.y}px)`;
             }
 

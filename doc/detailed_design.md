@@ -309,6 +309,7 @@
       bubbleElement: HTMLElement, // 吹き出しDOM要素への参照
       x: number,                  // 現在位置 X (px)
       y: number,                  // 現在位置 Y (px)
+      vx: number,                 // 水平速度 (px/frame)
       vy: number,                 // 垂直速度 (px/frame)
       size: number,               // 現在のサイズ (px)
       commentCount: number,       // 受信コメント数（成長判定用）
@@ -335,7 +336,9 @@
     - CSSの `@keyframes fly-out` により、拡大しながら指定の目的地へ高速に飛んでフェードアウトする軽量なCSS3アニメーションを適用する。
 
 ### 6.2 プレビューおよびアバター成長ロジック
-* **初期スポーン**: 画面上端中央 `x = (windowWidth - size) / 2`, `y = 0`, `vy = 0` でアバターを生成。初期サイズは `ConfigManager` より取得した `obs_avatar_min_size`。
+* **初期スポーン**:
+  - 重複を防ぐため、`userId` をシードとする決定論的ハッシュ関数から擬似乱数 $r_p \in [0.0, 1.0)$ を算出する。
+  - 初期配置座標 X を $x_{spawn} = (\text{windowWidth} - \text{size}) \cdot (0.2 + 0.6 \cdot r_p)$、Y座標を $0$、初期速度を $vx = 0$, $vy = 0$ としたアバターを出現させる。初期サイズは `ConfigManager` より取得した `obs_avatar_min_size`。
 * **成長判定**: 同一ユーザーからのコメント受信ごとに `commentCount` をインクリメント。サイズを `minSize + (commentCount * 10)` で拡張（上限は `obs_avatar_max_size`）。サイズ変更に合わせてDOM要素の幅・高さ、および物理境界判定の `size` を動的に更新する。
 * **吹き出し**: コメント受信時にアバターの頭上（`y - bubbleHeight`）に表示し（ユーザー名は含めず、メッセージ本文のみを表示）、7秒後にフェードアウトアニメーション（CSSクラス追加）を適用してDOMから削除する。アバターの移動・落下に同期して位置を追従させる。
 
@@ -349,6 +352,7 @@
 * **構成と境界スケーリング**:
   - 設定された解像度（`obsBrowserWidth`・`obsBrowserHeight`）に基づき、管理用ウィンドウサイズ内にアスペクト比維持で収まる最大縮小スケール `scale = Math.min(availW / obsBrowserWidth, availH / obsBrowserHeight)` を計算。
   - 中央配置された境界枠（`#bounds`）を可視化表示し、アバター要素は境界枠内の座標でドラッグ移動を制限する（境界判定）。
+  - **重複防止スポーン**: 表示画面と同様に `userId` をシードとする同一のハッシュベース擬似乱数 $r_p$ を用いて、初期スポーン座標 X を $x_{spawn} = (obsBrowserWidth - size) \cdot (0.2 + 0.6 \cdot r_p)$、Y座標を $50$ とした配置を行う。これにより、OBSと操作画面間で寸分違わない初期配置が同期される。
 * **ドラッグ＆ドロップ実装**:
   - `mousedown` / `mousemove` / `mouseup` を用いて境界枠内でアバター要素をドラッグ可能にする。
   - ドラッグ開始時: WebSocket経由で `{ "action": "drag_start", "userId": "..." }` を送信。

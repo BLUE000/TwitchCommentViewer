@@ -201,29 +201,18 @@ void AppController::customEvent(QEvent* event) {
                                   Q_ARG(double, sentiment),
                                   Q_ARG(bool, isSpam));
         
-        // 棒読みちゃん連携 (スパム判定や除外設定ユーザー/ボットのコメントはスキップ)
+        // 棒読みちゃん連携 (スパム判定や除外設定ユーザーのコメントはスキップ)
         if (!isSpam) {
             bool ttsIgnored = false;
             if (m_configManager) {
                 QString userNameLower = commentEvent->userName().toLower();
                 
-                // 1. 読み上げ除外ユーザーのチェック
+                // 1. 読み上げ除外ユーザーのチェック（これに該当する場合のみ読み上げを除外）
                 QStringList ignoreList = m_configManager->getTtsIgnoreUsers();
                 for (const QString& u : ignoreList) {
                     if (u.trimmed().compare(userNameLower, Qt::CaseInsensitive) == 0) {
                         ttsIgnored = true;
                         break;
-                    }
-                }
-                
-                // 2. ボットユーザーの自動除外チェック (ボットは読み上げない)
-                if (!ttsIgnored) {
-                    QStringList botList = m_configManager->getBotUsers();
-                    for (const QString& b : botList) {
-                        if (b.trimmed().compare(userNameLower, Qt::CaseInsensitive) == 0) {
-                            ttsIgnored = true;
-                            break;
-                        }
                     }
                 }
             }
@@ -233,22 +222,37 @@ void AppController::customEvent(QEvent* event) {
                 m_ttsIntegration->sendText(commentEvent->userName() + "、" + safeMessage);
             }
             
-            // OBS連携 (ONに設定されているもののみ実行)
-            QVariantMap obsPayload;
-            obsPayload["username"] = commentEvent->userName();
-            obsPayload["message"] = safeMessage;
-            
-            QString userId = commentEvent->userId();
-            if (m_avatarUrlCache.contains(userId)) {
-                obsPayload["avatarUrl"] = m_avatarUrlCache[userId];
+            // OBSアバター連携 (解析・集計設定の「ボットリスト」に含まれるユーザーはアバター表示から除外)
+            bool obsIgnored = false;
+            if (m_configManager) {
+                QString userNameLower = commentEvent->userName().toLower();
+                QStringList botList = m_configManager->getBotUsers();
+                for (const QString& b : botList) {
+                    if (b.trimmed().compare(userNameLower, Qt::CaseInsensitive) == 0) {
+                        obsIgnored = true;
+                        break;
+                    }
+                }
             }
-            obsPayload["badges"] = commentEvent->badgeUrls();
             
-            if (m_configManager->getObsFileOutputEnabled() && m_obsFileIntegration) {
-                m_obsFileIntegration->sendAction("comment", obsPayload);
-            }
-            if (m_configManager->getObsWebSocketEnabled() && m_obsWsIntegration) {
-                m_obsWsIntegration->sendAction("comment", obsPayload);
+            if (!obsIgnored) {
+                // OBS連携 (ONに設定されているもののみ実行)
+                QVariantMap obsPayload;
+                obsPayload["username"] = commentEvent->userName();
+                obsPayload["message"] = safeMessage;
+                
+                QString userId = commentEvent->userId();
+                if (m_avatarUrlCache.contains(userId)) {
+                    obsPayload["avatarUrl"] = m_avatarUrlCache[userId];
+                }
+                obsPayload["badges"] = commentEvent->badgeUrls();
+                
+                if (m_configManager->getObsFileOutputEnabled() && m_obsFileIntegration) {
+                    m_obsFileIntegration->sendAction("comment", obsPayload);
+                }
+                if (m_configManager->getObsWebSocketEnabled() && m_obsWsIntegration) {
+                    m_obsWsIntegration->sendAction("comment", obsPayload);
+                }
             }
         }
 

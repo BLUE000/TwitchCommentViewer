@@ -43,3 +43,6 @@ release_package/
 DecisionLog/
 .ai_rules.md
 WIP_STATE.md
+
+# OneComme Template (Local Development Only)
+onecomme_physics_avatar/
