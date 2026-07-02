@@ -1,5 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600&family=Noto+Sans+JP:wght@400;700&display=swap');
 
+:root {
+    --avatar-min-size: 50px;
+    --avatar-bounce: 30; /* % 単位 (e.g. 30 = e:0.3) */
+    --comment-font-size: 13px; /* コメントの文字サイズ */
+    --comment-max-width: 250px; /* 吹き出しの最大横幅 (デフォルト: 250px) */
+    --effect-size: 20px; /* エフェクト絵文字の表示サイズ */
+    --effect-count: 5; /* エフェクトの飛び散る個数 */
+    --avatar-jump-power: 10; /* 新しいコメントがあった時のアバター飛び上がり力 (0で無効) */
+}
+
 body {
     margin: 0;
     padding: 0;
@@ -51,6 +61,7 @@ body {
     box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
     animation: bubble-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
     box-sizing: border-box;
+    z-index: 1000;
 }
 
 /* 吹き出しの三角矢印 */
@@ -89,7 +100,7 @@ body {
 }
 
 .comment-text {
-    font-size: 13px;
+    font-size: var(--comment-font-size, 13px);
     color: #333;
     font-weight: 600;
     word-break: break-word;
@@ -156,36 +167,4 @@ body {
         transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1.5);
         opacity: 0;
     }
-}
-
-/* 管理画面用境界枠 */
-#bounds-wrapper {
-    position: relative;
-    width: 100vw;
-    height: 100vh;
-    box-sizing: border-box;
-    background-color: #fafafa;
-}
-
-#bounds-frame {
-    position: absolute;
-    border: 3px dashed #6441a5;
-    background-color: #ffffff;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
-    box-sizing: border-box;
-    overflow: hidden;
-}
-
-#bounds-title {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    font-size: 14px;
-    font-weight: bold;
-    color: #6441a5;
-    background: rgba(255, 255, 255, 0.8);
-    padding: 2px 6px;
-    border-radius: 4px;
-    pointer-events: none;
-    z-index: 10;
 }

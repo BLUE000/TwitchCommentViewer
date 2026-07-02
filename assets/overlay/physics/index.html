@@ -4,26 +4,297 @@
     <meta charset="UTF-8">
     <title>OBS Physics Avatar Overlay</title>
     <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <div id="container"></div>
-
     <script>
-        let wsPort = 8082; // デフォルトのフォールバック
-        if (window.location.port) {
-            wsPort = parseInt(window.location.port) + 1;
-        }
-
-        console.log(`Connecting to WebSocket on port ${wsPort}...`);
-        const ws = new WebSocket('ws://localhost:' + wsPort);
-
+        // 設定用変数
         let minSize = 50;
         let maxSize = 150;
         let bounceFactor = 30; // % 単位 (e.g. 30 = e:0.3)
         const gravity = 0.5;
         let avatars = [];
         let isSuspended = false;
+        let highLoadFrameCount = 0; // 連続高負荷フレームカウンター
+        let isOneSdkInitialized = false;
 
+        // 環境の自動判定フラグ (URLのパス名で判定)
+        const isOneComme = window.location.pathname.includes("/templates/custom/");
+        let showDebug = isOneComme; // わんコメ環境でのみデバッグログを初期表示可能にする
+        let ws = null; // C++ WebSocket
+
+        // エフェクトおよびC++連携用変数
+        let effectSymbols = "♥,♦,♣,♠";
+        let effectSize = 20;
+        let effectCount = 5;
+        let jumpPower = 10; // コメントがあった時のアバター飛び上がり力 (0で無効)
+
+        function logDebug(msg) {
+            console.log(msg);
+            if (!showDebug) return;
+            const el = document.getElementById('debug-info');
+            if (el) {
+                const lines = el.innerHTML.split('<br>');
+                lines.push(msg);
+                if (lines.length > 15) {
+                    // ヘッダー行を残しつつスクロール
+                    lines.splice(1, 1);
+                }
+                el.innerHTML = lines.join('<br>');
+            }
+        }
+
+        // 最速でエラーをキャッチして画面に描画する
+        window.onerror = function(message, source, lineno, colno, error) {
+            logDebug("❌ JS Error: " + message + " (Line " + lineno + ":" + colno + ")");
+            return false;
+        };
+
+        // CSS変数およびURLパラメータから設定をロードする関数（わんコメ単体使用時の設定変更手段）
+        function loadConfigurations() {
+            // 1. CSS変数からの読み込み（OBSのカスタムCSSでの調整を可能にする）
+            const rootStyles = getComputedStyle(document.documentElement);
+            const cssMin = parseInt(rootStyles.getPropertyValue('--avatar-min-size'));
+            const cssMax = parseInt(rootStyles.getPropertyValue('--avatar-max-size'));
+            const cssBounce = parseInt(rootStyles.getPropertyValue('--avatar-bounce'));
+            const cssEffectSize = parseInt(rootStyles.getPropertyValue('--effect-size'));
+            const cssEffectCount = parseInt(rootStyles.getPropertyValue('--effect-count'));
+            const cssJump = parseInt(rootStyles.getPropertyValue('--avatar-jump-power'));
+
+            if (!isNaN(cssMin)) minSize = cssMin;
+            if (!isNaN(cssMax)) maxSize = cssMax;
+            if (!isNaN(cssBounce)) bounceFactor = cssBounce;
+            if (!isNaN(cssEffectSize)) effectSize = cssEffectSize;
+            if (!isNaN(cssEffectCount)) effectCount = cssEffectCount;
+            if (!isNaN(cssJump)) jumpPower = cssJump;
+
+            // 2. URLパラメータからの読み込み（OBSソースのURL末尾での調整を可能にする）
+            const params = new URLSearchParams(window.location.search);
+            if (params.has('minSize')) minSize = parseInt(params.get('minSize'));
+            if (params.has('maxSize')) maxSize = parseInt(params.get('maxSize'));
+            if (params.has('bounce')) bounceFactor = parseInt(params.get('bounce'));
+            if (params.has('effectSize')) effectSize = parseInt(params.get('effectSize'));
+            if (params.has('effectCount')) effectCount = parseInt(params.get('effectCount'));
+            if (params.has('jumpPower')) jumpPower = parseInt(params.get('jumpPower'));
+            if (params.has('commentMaxWidth')) {
+                const urlMaxWidth = parseInt(params.get('commentMaxWidth'));
+                if (!isNaN(urlMaxWidth)) {
+                    document.documentElement.style.setProperty('--comment-max-width', `${urlMaxWidth}px`);
+                }
+            }
+
+            logDebug(`⚙️ Loaded Configs: Min=${minSize}, Max=${maxSize}, Bounce=${bounceFactor}, EffectSize=${effectSize}, EffectCount=${effectCount}, Jump=${jumpPower}`);
+        }
+
+        // C++中継サーバーWebSocket接続
+        function setupCppWebSocket() {
+            let wsPort = 8082;
+            if (window.location.port) {
+                wsPort = parseInt(window.location.port) + 1;
+            }
+            
+            console.log(`Connecting to C++ WebSocket on port ${wsPort}...`);
+            ws = new WebSocket('ws://localhost:' + wsPort);
+            
+            ws.onopen = () => {
+                console.log('Connected to C++ WebSocket Server');
+            };
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                if (data.action === 'comment') {
+                    handleComment(data.username, data.username, data.message, data.avatarUrl);
+                } else if (data.action === 'settings_changed') {
+                    minSize = data.minSize || 50;
+                    maxSize = data.maxSize || 150;
+                    bounceFactor = data.bounceFactor !== undefined ? data.bounceFactor : 30;
+                    effectSymbols = data.effectSymbols || "♥,♦,♣,♠";
+                    effectSize = data.effectSize || 20;
+                    effectCount = data.effectCount || 5;
+                    console.log(`Settings updated from C++: Min=${minSize}, Max=${maxSize}, Bounce=${bounceFactor}`);
+                    applySettings();
+                } else if (data.action === 'drag_start') {
+                    setDragging(data.userId, true);
+                } else if (data.action === 'drag_move') {
+                    moveAvatar(data.userId, data.x, data.y);
+                } else if (data.action === 'drag_end') {
+                    setDragging(data.userId, false);
+                } else if (data.action === 'double_click') {
+                    const av = avatars.find(a => a.userId === data.userId.toLowerCase());
+                    if (av) {
+                        createParticles(av.x + av.size / 2, av.y + av.size / 2);
+                    }
+                } else if (data.action === 'update_avatar') {
+                    const username = (data.username || "").trim().toLowerCase();
+                    const avatarUrl = data.avatarUrl;
+                    
+                    const av = avatars.find(a => a.userId === username);
+                    if (av && avatarUrl) {
+                        av.avatarUrl = avatarUrl;
+                        const img = av.element.querySelector('.avatar-image');
+                        if (img) {
+                            img.src = avatarUrl;
+                        }
+                    }
+                }
+            };
+            
+            ws.onclose = () => {
+                console.log('C++ WebSocket disconnected. Reconnecting in 3 seconds...');
+                setTimeout(setupCppWebSocket, 3000);
+            };
+        }
+
+        // C++連携用：設定の動的適用
+        function applySettings() {
+            avatars.forEach(av => {
+                av.size = Math.min(maxSize, minSize + (av.commentCount - 1) * 10);
+                av.element.style.width = `${av.size}px`;
+                av.element.style.height = `${av.size}px`;
+            });
+        }
+
+        // C++連携用：ドラッグ制御
+        function setDragging(userId, isDragging) {
+            const av = avatars.find(a => a.userId === userId.toLowerCase());
+            if (av) {
+                av.isDragging = isDragging;
+                if (isDragging) {
+                    av.vx = 0;
+                    av.vy = 0;
+                }
+            }
+        }
+
+        // C++連携用：ドラッグ移動
+        function moveAvatar(userId, x, y) {
+            const av = avatars.find(a => a.userId === userId.toLowerCase());
+            if (av) {
+                av.x = x;
+                av.y = y;
+                av.element.style.transform = `translate(${x}px, ${y}px)`;
+            }
+        }
+
+        // WebSocket送信安全ラッパー
+        function sendWsMessage(payload) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify(payload));
+            }
+        }
+
+        // 一意のコメントID履歴（重複生成防止）
+        const processedCommentIds = new Set();
+
+        // わんコメ SDK 初期化
+        function initOneSDK() {
+            if (typeof OneSDK === 'undefined') {
+                logDebug("❌ OneSDK is not defined in initOneSDK.");
+                return;
+            }
+            if (isOneSdkInitialized) return;
+            isOneSdkInitialized = true;
+
+            logDebug("Initializing OneSDK... (Official Preset Way)");
+            try {
+                OneSDK.setup({
+                    permissions: OneSDK.usePermission([OneSDK.PERM.COMMENT])
+                });
+            } catch (e) {
+                logDebug("❌ OneSDK setup failed: " + e.message);
+                console.error(e);
+                return;
+            }
+
+            logDebug("Subscribing to comments...");
+            try {
+                OneSDK.subscribe({
+                    action: 'comments',
+                    callback: (comments) => {
+                        logDebug(`Received comments array. Count: ${comments.length}`);
+                        comments.forEach(comment => {
+                            const id = comment.data && comment.data.id;
+                            if (!id) return;
+
+                            if (!processedCommentIds.has(id)) {
+                                processedCommentIds.add(id);
+
+                                const username = comment.data.displayName || comment.data.name;
+                                const userUniqueId = comment.data.name || comment.data.displayName || "";
+                                const message = comment.data.comment;
+                                const avatarUrl = comment.data.profileImage;
+
+                                logDebug(`New comment: [${username}] (${userUniqueId}) ${message.substring(0, 10)}...`);
+                                handleComment(userUniqueId, username, message, avatarUrl);
+                            }
+                        });
+
+                        // メモリリーク防止のため古いID履歴をパージ
+                        if (processedCommentIds.size > 200) {
+                            const keys = Array.from(processedCommentIds);
+                            for (let i = 0; i < 100; i++) {
+                                processedCommentIds.delete(keys[i]);
+                            }
+                        }
+                    }
+                });
+            } catch (e) {
+                logDebug("❌ OneSDK subscribe failed: " + e.message);
+                console.error(e);
+                return;
+            }
+
+            logDebug("Connecting OneSDK WebSocket...");
+            try {
+                OneSDK.connect();
+            } catch (e) {
+                logDebug("❌ OneSDK connect failed: " + e.message);
+                console.error(e);
+                return;
+            }
+
+            OneSDK.ready().then(() => {
+                logDebug("🟢 OneSDK connection ready. Listening for comments...");
+            }).catch(err => {
+                logDebug("❌ OneSDK ready failed: " + err.message);
+                console.error(err);
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadConfigurations();
+            
+            if (isOneComme) {
+                // わんコメ環境：onesdk.js を動的ロードして初期化
+                logDebug("🟢 OneComme environment detected. Loading onesdk.js...");
+                const script = document.createElement('script');
+                script.src = "../__origin/js/onesdk.js";
+                script.onload = () => {
+                    initOneSDK();
+                };
+                script.onerror = () => {
+                    logDebug("❌ Failed to load onesdk.js. Make sure you are in OneComme environment.");
+                };
+                document.head.appendChild(script);
+            } else {
+                // C++ツール環境：WebSocket 接続を開始
+                const dbg = document.getElementById('debug-info');
+                if (dbg) dbg.style.display = 'none'; // C++環境では非表示
+                showDebug = false;
+                setupCppWebSocket();
+            }
+        });
+    </script>
+</head>
+<body>
+    <div id="debug-info" style="position: absolute; top: 10px; left: 10px; color: #00ff00; background: rgba(0,0,0,0.85); font-family: monospace; font-size: 11px; padding: 10px; border-radius: 6px; border: 1px solid #00ff00; z-index: 9999; max-width: 450px; word-break: break-all; pointer-events: none; line-height: 1.4;">
+        [OBS Physics Avatar Debug Log]<br>
+        Status: Waiting for SDK...
+    </div>
+    <div id="container"></div>
+
+    <script>
+        const defaultAvatar = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%236441a5"/><text x="50%" y="65%" font-size="40" font-family="Outfit" font-weight="bold" fill="white" text-anchor="middle">💬</text></svg>';
+
+        // 決定論的ハッシュ乱数
         function getDeterministicRandom(str) {
             let hash = 2166136261;
             for (let i = 0; i < str.length; i++) {
@@ -33,59 +304,20 @@
             return (hash >>> 0) / 4294967295;
         }
 
-        const defaultAvatar = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%236441a5"/><text x="50%" y="65%" font-size="40" font-family="Outfit" font-weight="bold" fill="white" text-anchor="middle">💬</text></svg>';
-
-        ws.onopen = () => {
-            console.log('Connected to OBS WebSocket Server');
-        };
-
-        let effectSymbols = "♥,♦,♣,♠";
-        let effectSize = 20;
-        let effectCount = 5;
-
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-
-            if (data.action === 'comment') {
-                handleComment(data.username, data.message, data.avatarUrl);
-            } else if (data.action === 'settings_changed') {
-                minSize = data.minSize || 50;
-                maxSize = data.maxSize || 150;
-                bounceFactor = data.bounceFactor !== undefined ? data.bounceFactor : 30;
-                effectSymbols = data.effectSymbols || "♥,♦,♣,♠";
-                effectSize = data.effectSize || 20;
-                effectCount = data.effectCount || 5;
-                console.log(`Settings updated: Min=${minSize}, Max=${maxSize}, Bounce=${bounceFactor}`);
-                applySettings();
-            } else if (data.action === 'drag_start') {
-                setDragging(data.userId, true);
-            } else if (data.action === 'drag_move') {
-                moveAvatar(data.userId, data.x, data.y);
-            } else if (data.action === 'drag_end') {
-                setDragging(data.userId, false);
-            } else if (data.action === 'double_click') {
-                const av = avatars.find(a => a.userId === data.userId.toLowerCase());
-                if (av) {
-                    createParticles(av.x + av.size / 2, av.y + av.size / 2);
-                }
-            } else if (data.action === 'update_avatar') {
-                const username = (data.username || "").trim().toLowerCase();
-                const avatarUrl = data.avatarUrl;
-                
-                const av = avatars.find(a => a.userId === username);
-                if (av && avatarUrl) {
-                    av.avatarUrl = avatarUrl;
-                    const img = av.element.querySelector('.avatar-image');
-                    if (img) {
-                        img.src = avatarUrl;
-                    }
-                }
+        function handleComment(userUniqueId, username, message, avatarUrl) {
+            // アバターが正常に生成されたら、3秒後にデバッグログ表示を非表示にする
+            const dbg = document.getElementById('debug-info');
+            if (dbg && dbg.style.display !== 'none') {
+                setTimeout(() => {
+                    dbg.style.display = 'none';
+                    showDebug = false;
+                }, 3000);
             }
-        };
 
-        function handleComment(username, message, avatarUrl) {
-            const userId = username.toLowerCase(); // 簡易的な一意のユーザーID
+            const userId = (userUniqueId || "").trim().toLowerCase(); // 一意のキーとして扱う
             let av = avatars.find(a => a.userId === userId);
+
+            logDebug(`[DBG] handleComment: user="${username}", id="${userId}", exists=${!!av}, av_len=${avatars.length}`);
 
             if (av) {
                 // 画像URLが途中で確定した（あるいは新しいURLになった）場合は上書き更新
@@ -99,12 +331,22 @@
 
                 // 既存アバターの成長と吹き出し更新
                 av.commentCount++;
-                av.size = Math.min(maxSize, minSize + av.commentCount * 10);
+                av.size = Math.min(maxSize, minSize + (av.commentCount - 1) * 10);
                 av.element.style.width = `${av.size}px`;
                 av.element.style.height = `${av.size}px`;
 
                 // 吹き出し表示
                 showBubble(av, username, message);
+                
+                // コメントがあった時にピョコッと上に飛び上がらせる（ジャンプさせる）
+                if (jumpPower > 0) {
+                    av.vy = -jumpPower;
+                    // 横方向にも少し跳ねる動きを加える
+                    av.vx = (Math.random() - 0.5) * (jumpPower * 0.6);
+                }
+                
+                // コメントされたアバターの中心から自動的にエフェクト（パーティクル）を発生させる！
+                createParticles(av.x + av.size / 2, av.y + av.size / 2);
             } else {
                 // 新規アバター作成
                 const container = document.getElementById('container');
@@ -112,55 +354,82 @@
                 avDiv.className = 'avatar-container';
                 avDiv.style.width = `${minSize}px`;
                 avDiv.style.height = `${minSize}px`;
+                avDiv.style.opacity = '0'; // 画像がロードされるまで非表示にしておく
+
+                // OBSの「対話」機能等で直接ダブルクリックされた際にエフェクトを発生させるリスナー
+                avDiv.addEventListener('dblclick', () => {
+                    createParticles(av.x + av.size / 2, av.y + av.size / 2);
+                    // C++環境下であればWebSocketで同期ブロードキャスト
+                    sendWsMessage({
+                        action: 'double_click',
+                        userId: av.userId
+                    });
+                });
+
+                // OBSの対話機能でアバターを直接ドラッグ移動するためのマウスイベント
+                let dragOffsetX = 0;
+                let dragOffsetY = 0;
+
+                const onMouseMove = (e) => {
+                    if (!av.isDragging) return;
+                    av.x = e.clientX - dragOffsetX;
+                    av.y = e.clientY - dragOffsetY;
+                    av.vx = 0;
+                    av.vy = 0;
+                    avDiv.style.transform = `translate(${av.x}px, ${av.y}px)`;
+                    
+                    // C++環境下であれば座標移動をWebSocket同期
+                    sendWsMessage({
+                        action: 'drag_move',
+                        userId: av.userId,
+                        x: av.x,
+                        y: av.y
+                    });
+                };
+
+                const onMouseUp = () => {
+                    if (av.isDragging) {
+                        av.isDragging = false;
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                        
+                        // C++環境下であればドラッグ終了をWebSocket同期
+                        sendWsMessage({
+                            action: 'drag_end',
+                            userId: av.userId
+                        });
+                    }
+                };
+
+                avDiv.addEventListener('mousedown', (e) => {
+                    if (e.button !== 0) return; // 左クリックのみ対象
+                    av.isDragging = true;
+                    av.vx = 0;
+                    av.vy = 0;
+                    dragOffsetX = e.clientX - av.x;
+                    dragOffsetY = e.clientY - av.y;
+
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                    
+                    // C++環境下であればドラッグ開始をWebSocket同期
+                    sendWsMessage({
+                        action: 'drag_start',
+                        userId: av.userId
+                    });
+                    
+                    e.preventDefault();
+                });
 
                 const img = document.createElement('img');
                 img.className = 'avatar-image';
-                img.src = avatarUrl || defaultAvatar;
-                avDiv.appendChild(img);
-
-                container.appendChild(avDiv);
 
                 const windowWidth = window.innerWidth;
                 const size = minSize;
 
-                // 完全ランダムかつ既存アバターと衝突しない位置（重なりNG）を探索
-                let spawnX = 0;
-                let attempts = 0;
-                let validPos = false;
-
-                while (!validPos && attempts < 100) {
-                    attempts++;
-                    // 画面の左右端からはみ出さないランダムX座標
-                    spawnX = Math.random() * (windowWidth - size);
-                    validPos = true;
-
-                    // 既存のすべてのアバターと当たり判定を行い、重なる場合は再探索
-                    for (let i = 0; i < avatars.length; i++) {
-                        const other = avatars[i];
-                        const rA = size / 2;
-                        const rB = other.size / 2;
-                        const cAx = spawnX + rA;
-                        const cAy = 0 + rA; // スポーン初期Yは0
-                        const cBx = other.x + rB;
-                        const cBy = other.y + rB;
-
-                        const dx = cBx - cAx;
-                        const dy = cBy - cAy;
-                        const distance = Math.sqrt(dx * dx + dy * dy);
-                        const minDist = rA + rB;
-
-                        // わずかな重なりも防ぐため、2pxの安全マージンを持たせる
-                        if (distance < (minDist + 2)) {
-                            validPos = false;
-                            break;
-                        }
-                    }
-                }
-
-                // 万が一100回探しても見つからなかった場合は完全ランダムに配置
-                if (!validPos) {
-                    spawnX = Math.random() * (windowWidth - size);
-                }
+                // 重複防止スポーンX座標
+                const rp = getDeterministicRandom(userId);
+                const spawnX = (windowWidth - size) * (0.2 + 0.6 * rp);
 
                 av = {
                     userId: userId,
@@ -178,50 +447,74 @@
                     bubbleTimer: null
                 };
 
-                // 初期配置
-                avDiv.style.transform = `translate(${av.x}px, ${av.y}px)`;
+                // ★ 同期的に即座に avatars リストに追加！これによって重複生成を絶対に防ぐ
                 avatars.push(av);
 
-                // ダブルクリックイベント (OBSインタラクト等で直接クリックされたらエフェクト表示＆同期)
-                avDiv.addEventListener('dblclick', () => {
-                    ws.send(JSON.stringify({
-                        action: 'double_click',
-                        userId: av.userId
-                    }));
+                // 画像がロード完了したタイミングで画面に追加して落下開始（画像のチラつきや白丸の表示遅れ防止）
+                let isInitialized = false;
+                const initAvatarSpawn = () => {
+                    if (isInitialized) return;
+                    isInitialized = true;
+                    
+                    avDiv.appendChild(img);
+                    container.appendChild(avDiv);
+                    
+                    avDiv.style.transform = `translate(${av.x}px, ${av.y}px)`;
+                    avDiv.style.opacity = '1'; // 表示開始！
+                    
+                    showBubble(av, username, message);
+                    
+                    // コメントされたアバターの中心から自動的にエフェクト（パーティクル）を発生させる！
                     createParticles(av.x + av.size / 2, av.y + av.size / 2);
-                });
+                    
+                    // アバター上限（最大30人）監視
+                    if (avatars.length > 30) {
+                        const oldest = avatars.shift();
+                        oldest.element.classList.add('fade-out');
+                        setTimeout(() => {
+                            if (oldest.element.parentNode) {
+                                oldest.element.parentNode.removeChild(oldest.element);
+                            }
+                        }, 500);
+                    }
+                };
 
-                showBubble(av, username, message);
-
-                // アバター上限（最大30人）監視
-                if (avatars.length > 30) {
-                    const oldest = avatars.shift();
-                    oldest.element.classList.add('fade-out');
-                    setTimeout(() => {
-                        if (oldest.element.parentNode) {
-                            oldest.element.parentNode.removeChild(oldest.element);
-                        }
-                    }, 500);
-                }
+                img.onload = initAvatarSpawn;
+                img.onerror = () => {
+                    img.src = defaultAvatar;
+                    initAvatarSpawn();
+                };
+                
+                // 画像URLを流し込んでロード開始
+                img.src = avatarUrl || defaultAvatar;
             }
         }
 
         function showBubble(av, username, message) {
+            const safeMsg = typeof message === 'string' ? message : String(message || '');
+            logDebug(`💬 showBubble for ${username}: ${safeMsg.substring(0, 15)}...`);
+            
             // 既存の吹き出しがあれば消去
             if (av.bubbleElement) {
-                if (av.bubbleElement.parentNode) {
-                    av.bubbleElement.parentNode.removeChild(av.bubbleElement);
+                try {
+                    if (av.bubbleElement.parentNode) {
+                        av.bubbleElement.parentNode.removeChild(av.bubbleElement);
+                    }
+                } catch (e) {
+                    console.error("Failed to remove old bubble:", e);
                 }
                 clearTimeout(av.bubbleTimer);
+                av.bubbleElement = null;
             }
 
             // 吹き出し要素の作成
             const bubble = document.createElement('div');
             bubble.className = 'comment-bubble';
             
+            // コメント本文（HTML絵文字等に対応するためinnerHTMLを使用。元のC++仕様に合わせ名前は非表示）
             const textDiv = document.createElement('div');
             textDiv.className = 'comment-text';
-            textDiv.textContent = message;
+            textDiv.innerHTML = safeMsg;
             bubble.appendChild(textDiv);
 
             av.element.appendChild(bubble);
@@ -241,32 +534,35 @@
             }, 7000);
         }
 
-        function setDragging(userId, isDragging) {
-            const av = avatars.find(a => a.userId === userId.toLowerCase());
-            if (av) {
-                av.isDragging = isDragging;
-                if (isDragging) {
-                    av.vy = 0;
-                }
-            }
-        }
+        function createParticles(x, y) {
+            const container = document.getElementById('container');
+            if (!container) return;
 
-        function moveAvatar(userId, x, y) {
-            const av = avatars.find(a => a.userId === userId.toLowerCase());
-            if (av) {
-                av.x = x;
-                av.y = y;
-                av.element.style.transform = `translate(${av.x}px, ${av.y}px)`;
-            }
-        }
+            const symbols = effectSymbols.split(',').map(s => s.trim()).filter(s => s.length > 0);
+            if (symbols.length === 0) return;
 
-        function applySettings() {
-            // 現在出現中の全アバターのサイズ更新を適用
-            avatars.forEach(av => {
-                av.size = Math.min(maxSize, minSize + av.commentCount * 10);
-                av.element.style.width = `${av.size}px`;
-                av.element.style.height = `${av.size}px`;
-            });
+            for (let i = 0; i < effectCount; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                p.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+                p.style.left = `${x}px`;
+                p.style.top = `${y}px`;
+                p.style.fontSize = `${effectSize}px`;
+
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 40 + Math.random() * 60;
+                const tx = Math.cos(angle) * distance;
+                const ty = Math.sin(angle) * distance - 30;
+
+                p.style.setProperty('--tx', `${tx}px`);
+                p.style.setProperty('--ty', `${ty}px`);
+
+                container.appendChild(p);
+
+                setTimeout(() => {
+                    p.remove();
+                }, 1000);
+            }
         }
 
         // 物理ループシミュレーション (1フレームごとに呼び出し)
@@ -312,7 +608,7 @@
                     av.vx = - (av.vx || 0) * (bounceFactor / 100);
                 }
 
-                // DOM位置更新 (回転角0度固定)
+                // DOM位置更新
                 av.element.style.transform = `translate(${av.x}px, ${av.y}px)`;
             }
 
@@ -337,11 +633,10 @@
                     const minDist = rA + rB;
 
                     if (distance < minDist) {
-                        // 衝突法線
                         const nx = dx / (distance || 1);
                         const ny = dy / (distance || 1);
 
-                        // めり込み解決 (位置の押し戻し)
+                        // めり込み解決
                         const overlap = minDist - distance;
 
                         if (a.isDragging) {
@@ -351,25 +646,19 @@
                             a.x -= nx * overlap;
                             a.y -= ny * overlap;
                         } else {
-                            // 等分で押し戻し
                             a.x -= nx * overlap * 0.5;
                             a.y -= ny * overlap * 0.5;
                             b.x += nx * overlap * 0.5;
                             b.y += ny * overlap * 0.5;
                         }
 
-                        // 相対速度
+                        // 衝突反射
                         const rvx = (b.vx || 0) - (a.vx || 0);
                         const rvy = (b.vy || 0) - (a.vy || 0);
-
-                        // 法線方向の相対速度
                         const velAlongNormal = rvx * nx + rvy * ny;
 
-                        // 接近している場合のみ弾き合い処理
                         if (velAlongNormal < 0) {
                             const e = bounceFactor / 100;
-
-                            // 質量をサイズに比例させる (サイズが大きいほど質量が大きい)
                             const massA = a.isDragging ? 100000000 : a.size;
                             const massB = b.isDragging ? 100000000 : b.size;
 
@@ -391,55 +680,30 @@
                 }
             }
 
-            // 位置が補正された後の DOM 要素位置の再更新
+            // 位置適用
             for (let i = 0; i < avatars.length; i++) {
                 const av = avatars[i];
                 av.element.style.transform = `translate(${av.x}px, ${av.y}px)`;
             }
 
-            // 計算時間監視によるフリーズ防止 (セーフティガバナー)
+            // セーフティガバナー
             const duration = performance.now() - startTime;
-            if (duration > 10) {
-                console.warn(`Physics loop took ${duration}ms (Threshold 10ms exceeded). Suspending to prevent OBS crash.`);
-                isSuspended = true;
+            if (duration > 16.6) {
+                highLoadFrameCount++;
+                if (highLoadFrameCount > 90) {
+                    console.warn(`Continuous high compute load detected (${duration}ms for 90+ frames). Suspending to prevent OBS crash.`);
+                    isSuspended = true;
 
-                const warnDiv = document.createElement('div');
-                warnDiv.style.cssText = "position: absolute; top: 10px; left: 10px; color: %23ff4500; font-weight: bold; background: rgba(255, 255, 255, 0.9); border: 2px solid %23ff4500; border-radius: 8px; padding: 8px 12px; font-family: Outfit, sans-serif; box-shadow: 0 4px 10px rgba(0,0,0,0.2);";
-                warnDiv.textContent = "⚠️ High Compute Load Detected. Physics Simulation Suspended.";
-                document.body.appendChild(warnDiv);
+                    const warnDiv = document.createElement('div');
+                    warnDiv.style.cssText = "position: absolute; top: 10px; left: 10px; color: #ff4500; font-weight: bold; background: rgba(255, 255, 255, 0.9); border: 2px solid #ff4500; border-radius: 8px; padding: 8px 12px; font-family: Outfit, sans-serif; box-shadow: 0 4px 10px rgba(0,0,0,0.2);";
+                    warnDiv.textContent = "⚠️ High Compute Load Detected. Physics Simulation Suspended.";
+                    document.body.appendChild(warnDiv);
+                } else {
+                    requestAnimationFrame(updatePhysics);
+                }
             } else {
+                highLoadFrameCount = 0;
                 requestAnimationFrame(updatePhysics);
-            }
-        }
-
-        function createParticles(x, y) {
-            const container = document.getElementById('container');
-            if (!container) return;
-
-            const symbols = effectSymbols.split(',').map(s => s.trim()).filter(s => s.length > 0);
-            if (symbols.length === 0) return;
-
-            for (let i = 0; i < effectCount; i++) {
-                const p = document.createElement('div');
-                p.className = 'particle';
-                p.textContent = symbols[Math.floor(Math.random() * symbols.length)];
-                p.style.left = `${x}px`;
-                p.style.top = `${y}px`;
-                p.style.fontSize = `${effectSize}px`;
-
-                const angle = Math.random() * Math.PI * 2;
-                const distance = 40 + Math.random() * 60;
-                const tx = Math.cos(angle) * distance;
-                const ty = Math.sin(angle) * distance - 30; // 若干の上方向バイアス
-
-                p.style.setProperty('--tx', `${tx}px`);
-                p.style.setProperty('--ty', `${ty}px`);
-
-                container.appendChild(p);
-
-                setTimeout(() => {
-                    p.remove();
-                }, 1000);
             }
         }
 
