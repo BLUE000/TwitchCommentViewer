@@ -89,7 +89,7 @@
   - `btnCopyObsUrl` (QPushButton): 上記のURLをクリップボードにコピー。
   - `btnSaveObs` (QPushButton): 上記の設定を `config.json` に保存する。
   - **物理アバターオーバーレイ設定領域**:
-    - `groupBoxObsPhysics` (QGroupBox): 物理アバターオーバーレイの調整パネル（`comboObsOverlay` で `overlay_physics.html` が選択されている時のみ表示制御）。
+    - `groupBoxObsPhysics` (QGroupBox): 物理アバターオーバーレイの調整パネル（`comboObsOverlay` で `physics/index.html` が選択されている時のみ表示制御）。
     - `spinObsAvatarMinSize` (QSpinBox): アバターの最小サイズを設定（デフォルト 50 px）。
     - `spinObsAvatarMaxSize` (QSpinBox): アバターの最大サイズを設定（デフォルト 150 px）。
     - `spinObsBounceFactor` (QSpinBox): 地面衝突時の跳ね返りやすさを設定（0〜100%、デフォルト 30%）。
@@ -276,8 +276,8 @@
 4. Y軸の表示範囲を `niceStep` の倍数に丸めて `[0, roundedMax]` とし、`tickCountY = roundedMax / niceStep + 1` を設定する。
 
 ### 5.6 物理アバター座標同期シーケンス
-1. 管理画面（`overlay_control.html`）上でアバターがドラッグ開始された際、WebSocket経由で `drag_start` メッセージを送信。
-2. C++ `ObsWebSocketServer` が受信し、送信元以外の接続ソケット（表示画面 `overlay_physics.html`）へブロードキャスト。
+1. 管理画面（`physics/control.html`）上でアバターがドラッグ開始された際、WebSocket経由で `drag_start` メッセージを送信。
+2. C++ `ObsWebSocketServer` が受信し、送信元以外の接続ソケット（表示画面 `physics/index.html`）へブロードキャスト。
 3. 表示画面側は、対象アバターの `isDragging` フラグを `true` にし、物理落下・バウンド演算を一時サスペンドする。
 4. 管理画面上でドラッグ移動中、境界枠左上からの相対座標をスケール値で割って実解像度座標 `(x, y)` を求め、WebSocket経由で `drag_move(x, y)` メッセージをリアルタイム送信。
 5. C++ `ObsWebSocketServer` が転送し、表示画面側のアバターの座標 `(x, y)`（1:1解像度空間）を直接更新する（描画のみ同期）。
@@ -285,8 +285,8 @@
 7. C++ `ObsWebSocketServer` が転送し、表示画面側は `isDragging` フラグを `false` に戻す。アバターはドロップされた現在座標を初速度ゼロの起点として、物理落下を再開する。
 
 ### 5.7 ダブルクリックエフェクト同期シーケンス
-1. 管理画面（`overlay_control.html`）上でアバターがダブルクリックされた際、WebSocket経由で `double_click` メッセージ（`{"action": "double_click", "userId": "ユーザー名"}`）を送信し、かつ管理画面ローカルでもパーティクルエフェクト関数 `createParticles` を呼び出す。
-2. C++ `ObsWebSocketServer` が `double_click` メッセージを受信し、送信元以外の接続ソケット（表示画面 `overlay_physics.html`）へブロードキャスト。
+1. 管理画面（`physics/control.html`）上でアバターがダブルクリックされた際、WebSocket経由で `double_click` メッセージ（`{"action": "double_click", "userId": "ユーザー名"}`）を送信し、かつ管理画面ローカルでもパーティクルエフェクト関数 `createParticles` を呼び出す。
+2. C++ `ObsWebSocketServer` が `double_click` メッセージを受信し、送信元以外の接続ソケット（表示画面 `physics/index.html`）へブロードキャスト。
 3. 表示画面側はメッセージを受信し、該当アバターの現在座標中心 `(x + size/2, y + size/2)` から、設定同期されている `effectSymbols`, `effectSize`, `effectCount` を用いて、四方に飛び散るフェードアウトパーティクルエフェクトを描画する。
 
 ---
@@ -295,7 +295,7 @@
 
 `assets/overlay/` ディレクトリ内に配置するHTML/JS/CSSアセットの内部モジュール詳細設計。
 
-### 6.1 物理表示画面 (`overlay_physics.html`)
+### 6.1 物理表示画面 (`physics/index.html`)
 * **構成**: 各アバターを `div`（アバター画像 `img` とコメント吹き出し `div` を内包）としてDOM動的生成・管理する構成とする。
 * **物理ループ (自作 2D シミュレーション)**:
   - `requestAnimationFrame` にて `updatePhysics()` ループを毎フレーム呼び出し。
@@ -348,7 +348,7 @@
   - `updatePhysics()` 内の処理開始から終了までの時間を `performance.now()` で計測。
   - 計算・描画処理時間が **10ms** を超えた場合、コンソールに警告ログを出力し、物理演算ループを一時停止（サスペンド状態）にする。再度安全な状態になるか、ユーザーによる管理画面からの操作が行われるまでサスペンド状態を維持し、ブラウザおよびOBSのフリーズを防止する。
 
-### 6.4 管理操作画面 (`overlay_control.html`)
+### 6.2 管理操作画面 (`physics/control.html`)
 * **構成と境界スケーリング**:
   - 設定された解像度（`obsBrowserWidth`・`obsBrowserHeight`）に基づき、管理用ウィンドウサイズ内にアスペクト比維持で収まる最大縮小スケール `scale = Math.min(availW / obsBrowserWidth, availH / obsBrowserHeight)` を計算。
   - 中央配置された境界枠（`#bounds`）を可視化表示し、アバター要素は境界枠内の座標でドラッグ移動を制限する（境界判定）。

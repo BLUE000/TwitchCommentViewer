@@ -355,9 +355,10 @@ TEST(ObsHttpServerTest, SecurityFilters) {
     QString tempRoot = QCoreApplication::applicationDirPath() + "/test_assets";
     QDir().mkpath(tempRoot);
     server.setDocumentRoot(tempRoot);
-    server.setIndexFile("overlay.html");
+    server.setIndexFile("standard/index.html");
 
-    QFile dummyFile(tempRoot + "/overlay.html");
+    QDir(tempRoot).mkpath("standard");
+    QFile dummyFile(tempRoot + "/standard/index.html");
     ASSERT_TRUE(dummyFile.open(QIODevice::WriteOnly));
     dummyFile.write("Hello Overlay");
     dummyFile.close();
@@ -388,23 +389,24 @@ TEST(ObsHttpServerTest, SecurityFilters) {
     };
 
     // Test 1: Valid request
-    QByteArray res1 = sendRequest("/overlay.html");
+    QByteArray res1 = sendRequest("/standard/index.html");
     EXPECT_TRUE(res1.startsWith("HTTP/1.1 200 OK"));
     EXPECT_TRUE(res1.contains("Content-Security-Policy"));
     EXPECT_TRUE(res1.contains("Hello Overlay"));
 
     // Test 2: Invalid characters in URL path (should be blocked by RegularExpression)
-    QByteArray res2 = sendRequest("/over lay.html");
+    QByteArray res2 = sendRequest("/standard/index$$.html");
     EXPECT_TRUE(res2.startsWith("HTTP/1.1 404 Not Found") || res2.isEmpty());
 
-    QByteArray res3 = sendRequest("/overlay.html%00");
+    QByteArray res3 = sendRequest("/standard/index.html%00");
     EXPECT_TRUE(res3.startsWith("HTTP/1.1 404 Not Found") || res3.isEmpty());
 
     // Test 3: Directory traversal containing ".." (should be blocked by RegularExpression)
     QByteArray res4 = sendRequest("/../CMakeLists.txt");
     EXPECT_TRUE(res4.startsWith("HTTP/1.1 404 Not Found") || res4.isEmpty());
 
-    QFile::remove(tempRoot + "/overlay.html");
+    QFile::remove(tempRoot + "/standard/index.html");
+    QDir(tempRoot).rmdir("standard");
     QDir().rmdir(tempRoot);
 }
 

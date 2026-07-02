@@ -105,7 +105,7 @@ bool ConfigManager::loadConfig() {
         m_obsServerPort = json["obs_server_port"].toInt(8081);
     }
     if (json.contains("obs_overlay_file")) {
-        m_obsOverlayFile = json["obs_overlay_file"].toString("overlay.html");
+        m_obsOverlayFile = json["obs_overlay_file"].toString("standard/index.html");
     }
     if (json.contains("obs_avatar_min_size")) {
         m_obsAvatarMinSize = json["obs_avatar_min_size"].toInt(50);

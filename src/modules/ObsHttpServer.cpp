@@ -9,7 +9,7 @@
 
 ObsHttpServer::ObsHttpServer(QObject* parent) 
     : QTcpServer(parent)
-    , m_indexFile("overlay.html")
+    , m_indexFile("standard/index.html")
 {
     m_documentRoot = QCoreApplication::applicationDirPath() + "/assets/overlay";
 }

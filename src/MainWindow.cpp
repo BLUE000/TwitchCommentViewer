@@ -537,13 +537,16 @@ void MainWindow::loadOverlayFiles() {
     QString path = QCoreApplication::applicationDirPath() + "/assets/overlay";
     QDir dir(path);
     if (dir.exists()) {
-        QStringList filters;
-        filters << "*.html" << "*.htm";
-        QStringList files = dir.entryList(filters, QDir::Files);
-        ui->comboObsOverlay->addItems(files);
+        QStringList subdirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+        for (const QString& subdir : subdirs) {
+            QDir subDirObj(dir.filePath(subdir));
+            if (subDirObj.exists("index.html")) {
+                ui->comboObsOverlay->addItem(subdir + "/index.html");
+            }
+        }
     }
     if (ui->comboObsOverlay->count() == 0) {
-        ui->comboObsOverlay->addItem("overlay.html");
+        ui->comboObsOverlay->addItem("standard/index.html");
     }
 }
 
@@ -1423,7 +1426,7 @@ void MainWindow::handleStreamStatusChanged(bool online, qint64 activeSessionId) 
 }
 
 void MainWindow::on_comboObsOverlay_currentTextChanged(const QString& text) {
-    bool isPhysics = (text == "overlay_physics.html");
+    bool isPhysics = (text == "physics/index.html");
     ui->groupBoxObsPhysics->setVisible(isPhysics);
 }
 
@@ -1478,7 +1481,7 @@ void MainWindow::updateObsPhysicsPreview() {
     ui->lblObsPhysicsPreview->setText(QString("サイズプレビュー: [ %1px 〜 %2px ]").arg(minSize).arg(maxSize));
 
     // WebSocket経由で即時ブロードキャスト
-    if (m_controller && m_configManager && ui->comboObsOverlay->currentText() == "overlay_physics.html") {
+    if (m_controller && m_configManager && ui->comboObsOverlay->currentText() == "physics/index.html") {
         QVariantMap payload;
         payload["minSize"] = minSize;
         payload["maxSize"] = maxSize;

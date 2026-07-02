@@ -167,7 +167,7 @@ private:
     bool m_obsFileOutputEnabled = false;
     bool m_obsWebSocketEnabled = false;
     int m_obsServerPort = 8081;
-    QString m_obsOverlayFile = "overlay.html";
+    QString m_obsOverlayFile = "standard/index.html";
     int m_obsAvatarMinSize = 50;
     int m_obsAvatarMaxSize = 150;
     int m_obsBounceFactor = 30;
