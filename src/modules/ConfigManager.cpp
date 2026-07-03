@@ -128,6 +128,7 @@ bool ConfigManager::loadConfig() {
     m_obsEffectSymbols = json.contains("obs_effect_symbols") ? json["obs_effect_symbols"].toString("♥,♦,♣,♠") : "♥,♦,♣,♠";
     m_obsEffectSize = json.contains("obs_effect_size") ? json["obs_effect_size"].toInt(20) : 20;
     m_obsEffectCount = json.contains("obs_effect_count") ? json["obs_effect_count"].toInt(5) : 5;
+    m_obsEffectOpacity = json.contains("obs_effect_opacity") ? json["obs_effect_opacity"].toInt(100) : 100;
 
     if (json.contains("bot_users") && json["bot_users"].isArray()) {
         QJsonArray botArray = json["bot_users"].toArray();
@@ -216,6 +217,7 @@ void ConfigManager::saveConfig() {
     rootObj["obs_effect_symbols"] = m_obsEffectSymbols;
     rootObj["obs_effect_size"] = m_obsEffectSize;
     rootObj["obs_effect_count"] = m_obsEffectCount;
+    rootObj["obs_effect_opacity"] = m_obsEffectOpacity;
 
     QJsonArray botArray;
     for (const QString& bot : m_botUsers) {
@@ -479,6 +481,14 @@ int ConfigManager::getObsEffectCount() const {
 
 void ConfigManager::setObsEffectCount(int count) {
     m_obsEffectCount = count;
+}
+
+int ConfigManager::getObsEffectOpacity() const {
+    return m_obsEffectOpacity;
+}
+
+void ConfigManager::setObsEffectOpacity(int opacity) {
+    m_obsEffectOpacity = opacity;
 }
 
 QStringList ConfigManager::getBotUsers() const {

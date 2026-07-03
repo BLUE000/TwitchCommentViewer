@@ -110,6 +110,7 @@
         let effectSymbols = "♥,♦,♣,♠";
         let effectSize = 20;
         let effectCount = 5;
+        let effectOpacity = 100;
 
         let scale = 1.0;
         let avatars = [];
@@ -145,6 +146,7 @@
                 effectSymbols = data.effectSymbols || "♥,♦,♣,♠";
                 effectSize = data.effectSize || 20;
                 effectCount = data.effectCount || 5;
+                effectOpacity = data.effectOpacity !== undefined ? data.effectOpacity : 100;
 
                 updateBoundsScale();
                 applySettings();
@@ -326,6 +328,7 @@
 
                 p.style.setProperty('--tx', `${tx}px`);
                 p.style.setProperty('--ty', `${ty}px`);
+                p.style.setProperty('--effect-opacity', effectOpacity / 100);
 
                 frame.appendChild(p);
 

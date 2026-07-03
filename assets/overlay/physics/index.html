@@ -24,6 +24,7 @@
         let effectSymbols = "♥,♦,♣,♠";
         let effectSize = 20;
         let effectCount = 5;
+        let effectOpacity = 100;
         let jumpPower = 10; // コメントがあった時のアバター飛び上がり力 (0で無効)
 
         function logDebug(msg) {
@@ -56,6 +57,7 @@
             const cssBounce = parseInt(rootStyles.getPropertyValue('--avatar-bounce'));
             const cssEffectSize = parseInt(rootStyles.getPropertyValue('--effect-size'));
             const cssEffectCount = parseInt(rootStyles.getPropertyValue('--effect-count'));
+            const cssEffectOpacity = parseInt(rootStyles.getPropertyValue('--effect-opacity'));
             const cssJump = parseInt(rootStyles.getPropertyValue('--avatar-jump-power'));
 
             if (!isNaN(cssMin)) minSize = cssMin;
@@ -63,6 +65,9 @@
             if (!isNaN(cssBounce)) bounceFactor = cssBounce;
             if (!isNaN(cssEffectSize)) effectSize = cssEffectSize;
             if (!isNaN(cssEffectCount)) effectCount = cssEffectCount;
+            if (!isNaN(cssEffectOpacity)) {
+                effectOpacity = cssEffectOpacity <= 1.0 ? cssEffectOpacity * 100 : cssEffectOpacity;
+            }
             if (!isNaN(cssJump)) jumpPower = cssJump;
 
             // 2. URLパラメータからの読み込み（OBSソースのURL末尾での調整を可能にする）
@@ -72,6 +77,7 @@
             if (params.has('bounce')) bounceFactor = parseInt(params.get('bounce'));
             if (params.has('effectSize')) effectSize = parseInt(params.get('effectSize'));
             if (params.has('effectCount')) effectCount = parseInt(params.get('effectCount'));
+            if (params.has('effectOpacity')) effectOpacity = parseInt(params.get('effectOpacity'));
             if (params.has('jumpPower')) jumpPower = parseInt(params.get('jumpPower'));
             if (params.has('commentMaxWidth')) {
                 const urlMaxWidth = parseInt(params.get('commentMaxWidth'));
@@ -109,7 +115,8 @@
                     effectSymbols = data.effectSymbols || "♥,♦,♣,♠";
                     effectSize = data.effectSize || 20;
                     effectCount = data.effectCount || 5;
-                    console.log(`Settings updated from C++: Min=${minSize}, Max=${maxSize}, Bounce=${bounceFactor}`);
+                    effectOpacity = data.effectOpacity !== undefined ? data.effectOpacity : 100;
+                    console.log(`Settings updated from C++: Min=${minSize}, Max=${maxSize}, Bounce=${bounceFactor}, Opacity=${effectOpacity}`);
                     applySettings();
                 } else if (data.action === 'drag_start') {
                     setDragging(data.userId, true);
@@ -556,6 +563,7 @@
 
                 p.style.setProperty('--tx', `${tx}px`);
                 p.style.setProperty('--ty', `${ty}px`);
+                p.style.setProperty('--effect-opacity', effectOpacity / 100);
 
                 container.appendChild(p);
 

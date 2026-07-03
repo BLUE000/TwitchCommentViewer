@@ -59,6 +59,7 @@ private slots:
     void on_editObsEffectSymbols_textChanged(const QString& text);
     void on_spinObsEffectSize_valueChanged(int value);
     void on_spinObsEffectCount_valueChanged(int value);
+    void on_spinObsEffectOpacity_valueChanged(int value);
     void updateObsPhysicsPreview();
     
     void on_btnToggleTts_toggled(bool checked);

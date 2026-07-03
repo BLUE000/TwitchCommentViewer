@@ -161,7 +161,7 @@ body {
 @keyframes fly-out {
     0% {
         transform: translate(-50%, -50%) scale(0.5);
-        opacity: 1;
+        opacity: var(--effect-opacity, 1.0);
     }
     100% {
         transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1.5);

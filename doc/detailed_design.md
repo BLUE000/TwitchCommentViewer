@@ -171,6 +171,7 @@
     - `obs_effect_symbols`（ダブルクリック時表示記号, デフォルト `"♥,♦,♣,♠"`)
     - `obs_effect_size`（パーティクルサイズ, デフォルト 20）
     - `obs_effect_count`（放出パーティクル数, デフォルト 5）
+    - `obs_effect_opacity`（パーティクルの不透明度/濃さ, デフォルト 100）
 * `saveToken(const QString& token)` / `loadToken()`: DPAPI / TransCipherを用いた暗号化トークンの保存とロード。
 * `getBotUsers()` / `setBotUsers(const QStringList& bots)`: BOT除外判定用リストの取得・更新。
 * `getTtsIgnoreUsers()` / `setTtsIgnoreUsers(const QStringList& users)`: 読み上げ無視ユーザーリストの取得・更新。
@@ -183,6 +184,7 @@
   - `getObsEffectSymbols() const` / `setObsEffectSymbols(const QString& symbols)`
   - `getObsEffectSize() const` / `setObsEffectSize(int size)`
   - `getObsEffectCount() const` / `setObsEffectCount(int count)`
+  - `getObsEffectOpacity() const` / `setObsEffectOpacity(int opacity)`
 
 #### `ITtsIntegration`
 * 棒読みちゃんとVOICEVOXの連携を抽象化するインターフェースクラス。
@@ -287,7 +289,7 @@
 ### 5.7 ダブルクリックエフェクト同期シーケンス
 1. 管理画面（`physics/control.html`）上でアバターがダブルクリックされた際、WebSocket経由で `double_click` メッセージ（`{"action": "double_click", "userId": "ユーザー名"}`）を送信し、かつ管理画面ローカルでもパーティクルエフェクト関数 `createParticles` を呼び出す。
 2. C++ `ObsWebSocketServer` が `double_click` メッセージを受信し、送信元以外の接続ソケット（表示画面 `physics/index.html`）へブロードキャスト。
-3. 表示画面側はメッセージを受信し、該当アバターの現在座標中心 `(x + size/2, y + size/2)` から、設定同期されている `effectSymbols`, `effectSize`, `effectCount` を用いて、四方に飛び散るフェードアウトパーティクルエフェクトを描画する。
+3. 表示画面側はメッセージを受信し、該当アバターの現在座標中心 `(x + size/2, y + size/2)` から、設定同期されている `effectSymbols`, `effectSize`, `effectCount`, `effectOpacity` を用いて、四方に飛び散るフェードアウトパーティクルエフェクトを描画する。
 
 ---
 

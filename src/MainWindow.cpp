@@ -288,6 +288,7 @@ void MainWindow::setConfigManager(ConfigManager* configManager) {
     ui->editObsEffectSymbols->setText(m_configManager->getObsEffectSymbols());
     ui->spinObsEffectSize->setValue(m_configManager->getObsEffectSize());
     ui->spinObsEffectCount->setValue(m_configManager->getObsEffectCount());
+    ui->spinObsEffectOpacity->setValue(m_configManager->getObsEffectOpacity());
 
     updateObsPhysicsPreview();
     on_comboObsOverlay_currentTextChanged(m_configManager->getObsOverlayFile());
@@ -395,6 +396,7 @@ void MainWindow::on_btnSaveObs_clicked() {
         m_configManager->setObsEffectSymbols(ui->editObsEffectSymbols->text());
         m_configManager->setObsEffectSize(ui->spinObsEffectSize->value());
         m_configManager->setObsEffectCount(ui->spinObsEffectCount->value());
+        m_configManager->setObsEffectOpacity(ui->spinObsEffectOpacity->value());
         
         m_configManager->saveConfig();
 
@@ -1476,6 +1478,11 @@ void MainWindow::on_spinObsEffectCount_valueChanged(int value) {
     updateObsPhysicsPreview();
 }
 
+void MainWindow::on_spinObsEffectOpacity_valueChanged(int value) {
+    Q_UNUSED(value);
+    updateObsPhysicsPreview();
+}
+
 void MainWindow::updateObsPhysicsPreview() {
     int minSize = ui->spinObsAvatarMinSize->value();
     int maxSize = ui->spinObsAvatarMaxSize->value();
@@ -1493,6 +1500,7 @@ void MainWindow::updateObsPhysicsPreview() {
         payload["effectSymbols"] = ui->editObsEffectSymbols->text();
         payload["effectSize"] = ui->spinObsEffectSize->value();
         payload["effectCount"] = ui->spinObsEffectCount->value();
+        payload["effectOpacity"] = ui->spinObsEffectOpacity->value();
         QMetaObject::invokeMethod(m_controller, "onBroadcastObsActionRequested", Qt::QueuedConnection,
                                   Q_ARG(QString, "settings_changed"),
                                   Q_ARG(QVariantMap, payload));

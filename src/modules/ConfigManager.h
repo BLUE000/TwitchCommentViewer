@@ -109,6 +109,8 @@ public:
     void setObsEffectSize(int size);
     int getObsEffectCount() const;
     void setObsEffectCount(int count);
+    int getObsEffectOpacity() const;
+    void setObsEffectOpacity(int opacity);
 
     // ボットユーザー設定
     QStringList getBotUsers() const;
@@ -176,6 +178,7 @@ private:
     QString m_obsEffectSymbols = "♥,♦,♣,♠";
     int m_obsEffectSize = 20;
     int m_obsEffectCount = 5;
+    int m_obsEffectOpacity = 100;
 
     QStringList m_botUsers;
     QStringList m_ttsIgnoreUsers;
