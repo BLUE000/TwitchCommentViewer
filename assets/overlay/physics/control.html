@@ -46,7 +46,39 @@
             height: 5px;
             background-color: #ff8c00;
             box-shadow: 0 -2px 10px rgba(255, 140, 0, 0.5);
+        }
+
+        /* 管理画面用境界枠 (共通 style.css から管理画面専用へ移設) */
+        #bounds-wrapper {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            box-sizing: border-box;
+            background-color: #2a2a2a; /* 背景は body と合わせてダークテーマに */
+        }
+
+        #bounds-frame {
+            position: absolute;
+            border: 3px dashed #ff8c00; /* 管理枠はオレンジの点線に変更 */
+            background-color: #1a1a1a; /* ダークテーマ用の背景 */
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        #bounds-title {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #ff8c00;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 4px 8px;
+            border-radius: 6px;
             pointer-events: none;
+            z-index: 10;
+            border: 1px solid rgba(255, 140, 0, 0.3);
         }
     </style>
 </head>
