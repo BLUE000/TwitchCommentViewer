@@ -62,8 +62,22 @@ void ObsHttpServer::onReadyRead() {
             QString absoluteFilePath = m_documentRoot + path;
             QFileInfo fileInfo(absoluteFilePath);
             if (!fileInfo.exists()) {
-                sendNotFound(socket);
-                return;
+                // フォールバック: ルート直下の相対リソースが404の場合、インデックスファイルのサブフォルダ配下を検索する
+                if (m_indexFile.contains('/')) {
+                    QString subDir = m_indexFile.left(m_indexFile.lastIndexOf('/') + 1); // "physics/" 等
+                    QString fallbackPath = m_documentRoot + "/" + subDir + path.mid(1);
+                    QFileInfo fallbackInfo(fallbackPath);
+                    if (fallbackInfo.exists()) {
+                        absoluteFilePath = fallbackPath;
+                        fileInfo = fallbackInfo;
+                    } else {
+                        sendNotFound(socket);
+                        return;
+                    }
+                } else {
+                    sendNotFound(socket);
+                    return;
+                }
             }
 
             QString canonicalRoot = QDir(m_documentRoot).canonicalPath();

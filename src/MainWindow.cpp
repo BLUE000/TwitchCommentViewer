@@ -292,10 +292,6 @@ void MainWindow::setConfigManager(ConfigManager* configManager) {
     updateObsPhysicsPreview();
     on_comboObsOverlay_currentTextChanged(m_configManager->getObsOverlayFile());
         
-    // OBSローカルのパスを生成してセットする (HTTP用)
-    QString url = QString("http://localhost:%1/").arg(m_configManager->getObsServerPort());
-    ui->editObsUrl->setText(url);
-
     markTtsSettingsUnsaved(false);
 }
 
@@ -407,7 +403,9 @@ void MainWindow::on_btnSaveObs_clicked() {
             QMetaObject::invokeMethod(m_controller, "reloadObsServer", Qt::QueuedConnection);
         }
         
-        QString url = QString("http://localhost:%1/").arg(ui->spinObsPort->value());
+        QString url = QString("http://localhost:%1/%2")
+                        .arg(ui->spinObsPort->value())
+                        .arg(ui->comboObsOverlay->currentText());
         ui->editObsUrl->setText(url);
         showStatusMessage("OBS連携の設定を保存しました。", 3000);
     }
@@ -1429,6 +1427,9 @@ void MainWindow::handleStreamStatusChanged(bool online, qint64 activeSessionId) 
 void MainWindow::on_comboObsOverlay_currentTextChanged(const QString& text) {
     bool isPhysics = (text == "physics/index.html");
     ui->groupBoxObsPhysics->setVisible(isPhysics);
+    
+    QString url = QString("http://localhost:%1/%2").arg(ui->spinObsPort->value()).arg(text);
+    ui->editObsUrl->setText(url);
 }
 
 void MainWindow::on_spinObsAvatarMinSize_valueChanged(int value) {
