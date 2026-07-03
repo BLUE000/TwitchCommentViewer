@@ -536,13 +536,14 @@ void MainWindow::loadOverlayFiles() {
     ui->comboObsOverlay->clear();
     QString path = QCoreApplication::applicationDirPath() + "/assets/overlay";
     QDir dir(path);
-    if (dir.exists()) {
-        QStringList subdirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-        for (const QString& subdir : subdirs) {
-            QDir subDirObj(dir.filePath(subdir));
-            if (subDirObj.exists("index.html")) {
-                ui->comboObsOverlay->addItem(subdir + "/index.html");
-            }
+    if (!dir.exists()) {
+        dir.mkpath(".");
+    }
+    QStringList subdirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString& subdir : subdirs) {
+        QDir subDirObj(dir.filePath(subdir));
+        if (subDirObj.exists("index.html")) {
+            ui->comboObsOverlay->addItem(subdir + "/index.html");
         }
     }
     if (ui->comboObsOverlay->count() == 0) {
