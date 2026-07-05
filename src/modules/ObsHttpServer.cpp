@@ -121,12 +121,17 @@ void ObsHttpServer::sendResponse(QTcpSocket* socket, const QString& filePath) {
     response.append("Content-Type: " + contentType.toUtf8() + "\r\n");
     response.append("Content-Length: " + QByteArray::number(content.size()) + "\r\n");
     // 第3の壁: CSP（Content-Security-Policy）ヘッダーの強制適用
-    response.append("Content-Security-Policy: default-src 'self' http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:* ws: wss:; img-src 'self' data: https://static-cdn.jtvnw.net; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';\r\n");
+    response.append("Content-Security-Policy: default-src 'self' http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:* ws: wss: https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: https://static-cdn.jtvnw.net; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;\r\n");
     response.append("Connection: close\r\n\r\n");
     response.append(content);
 
     socket->write(response);
     socket->flush();
+    
+    // 送信バッファのデータが完全に送信されるまで待機（LAN遅延対策）
+    if (socket->bytesToWrite() > 0) {
+        socket->waitForBytesWritten(3000); // 最大3秒待機
+    }
     socket->disconnectFromHost();
 }
 
