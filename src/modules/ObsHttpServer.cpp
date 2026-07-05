@@ -121,7 +121,7 @@ void ObsHttpServer::sendResponse(QTcpSocket* socket, const QString& filePath) {
     response.append("Content-Type: " + contentType.toUtf8() + "\r\n");
     response.append("Content-Length: " + QByteArray::number(content.size()) + "\r\n");
     // 第3の壁: CSP（Content-Security-Policy）ヘッダーの強制適用
-    response.append("Content-Security-Policy: default-src 'self' http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:*; img-src 'self' data: https://static-cdn.jtvnw.net; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';\r\n");
+    response.append("Content-Security-Policy: default-src 'self' http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:* ws: wss:; img-src 'self' data: https://static-cdn.jtvnw.net; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';\r\n");
     response.append("Connection: close\r\n\r\n");
     response.append(content);
 

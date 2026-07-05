@@ -100,8 +100,9 @@
             wsPort = parseInt(window.location.port) + 1;
         }
 
-        console.log(`Connecting to WebSocket on port ${wsPort}...`);
-        const ws = new WebSocket('ws://localhost:' + wsPort);
+        const wsHost = window.location.hostname || 'localhost';
+        console.log(`Connecting to WebSocket on ${wsHost}:${wsPort}...`);
+        const ws = new WebSocket('ws://' + wsHost + ':' + wsPort);
 
         let minSize = 50;
         let maxSize = 150;

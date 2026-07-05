@@ -392,6 +392,7 @@ TEST(ObsHttpServerTest, SecurityFilters) {
     QByteArray res1 = sendRequest("/standard/index.html");
     EXPECT_TRUE(res1.startsWith("HTTP/1.1 200 OK"));
     EXPECT_TRUE(res1.contains("Content-Security-Policy"));
+    EXPECT_TRUE(res1.contains("ws: wss:"));
     EXPECT_TRUE(res1.contains("Hello Overlay"));
 
     // Test 2: Invalid characters in URL path (should be blocked by RegularExpression)

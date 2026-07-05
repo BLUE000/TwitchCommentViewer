@@ -208,7 +208,7 @@
   1. **URLパス文字フィルタ**: リクエストされたURL（URLデコード前）が正規表現 `^[a-zA-Z0-9_\-\.\/]+$` にマッチするか検証。スペース、`%`、`:`、`\`、およびドット連続 `..` が含まれる場合はファイルアクセスを行わずに即座に `400 Bad Request` または `404 Not Found` を返す。
   2. **物理パス絶対範囲検証**: ドキュメントルート（`assets/overlay`）とリクエストされた相対パスを連結し、`QFileInfo::canonicalFilePath()` で物理実絶対パスを算出。これがドキュメントルートの物理実絶対パスで始まっていること（`startsWith`）を検証し、違反している場合は `403 Forbidden` を返す。
   3. **CSP（Content Security Policy）ヘッダーの強制適用**: 送出するHTTPヘッダーに以下を設定：
-     `Content-Security-Policy: default-src 'self' http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:*; img-src 'self' data: https://static-cdn.jtvnw.net; script-src 'self'; style-src 'self' 'unsafe-inline';`
+     `Content-Security-Policy: default-src 'self' http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:* ws: wss:; img-src 'self' data: https://static-cdn.jtvnw.net; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';`
 
 #### `ObsWebSocketServer`
 * **機能**: コメントイベントおよび管理画面からの座標同期イベントをブロードキャストする中継サーバー。
