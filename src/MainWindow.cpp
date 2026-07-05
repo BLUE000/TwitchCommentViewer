@@ -1427,7 +1427,9 @@ void MainWindow::handleStreamStatusChanged(bool online, qint64 activeSessionId) 
 }
 
 void MainWindow::on_comboObsOverlay_currentTextChanged(const QString& text) {
-    bool isPhysics = (text == "physics/index.html");
+    QString normText = text;
+    normText.replace('\\', '/');
+    bool isPhysics = normText.toLower().contains("physics/index.html");
     ui->groupBoxObsPhysics->setVisible(isPhysics);
     
     QString url = QString("http://localhost:%1/%2").arg(ui->spinObsPort->value()).arg(text);
@@ -1490,7 +1492,8 @@ void MainWindow::updateObsPhysicsPreview() {
     ui->lblObsPhysicsPreview->setText(QString("サイズプレビュー: [ %1px 〜 %2px ]").arg(minSize).arg(maxSize));
 
     // WebSocket経由で即時ブロードキャスト
-    if (m_controller && m_configManager && ui->comboObsOverlay->currentText().compare("physics/index.html", Qt::CaseInsensitive) == 0) {
+    QString currentOverlay = ui->comboObsOverlay->currentText().replace('\\', '/').toLower();
+    if (m_controller && m_configManager && currentOverlay.contains("physics/index.html")) {
         QVariantMap payload;
         payload["minSize"] = minSize;
         payload["maxSize"] = maxSize;
