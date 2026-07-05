@@ -46,6 +46,12 @@ void ObsHttpServer::onReadyRead() {
         if (tokens.size() >= 2 && tokens[0] == "GET") {
             QString path = tokens[1];
 
+            // クエリパラメータ（?以降）を分離してパス単体にする
+            int queryIndex = path.indexOf('?');
+            if (queryIndex != -1) {
+                path = path.left(queryIndex);
+            }
+
             // 第1の壁: URLパス文字フィルタ (許可文字以外、または連続ドットは即座に拒否)
             QRegularExpression allowedPattern("^[a-zA-Z0-9_\\-\\./]+$");
             if (!allowedPattern.match(path).hasMatch() || path.contains("..")) {
