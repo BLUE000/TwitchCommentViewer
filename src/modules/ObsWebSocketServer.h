@@ -14,6 +14,9 @@ public:
     void sendAction(const QString& actionType, const QVariantMap& payload) override;
     quint16 serverPort() const;
 
+signals:
+    void clientConnected();
+
 private slots:
     void onNewConnection();
     void processTextMessage(const QString& message);

@@ -26,6 +26,7 @@ void ObsWebSocketServer::onNewConnection() {
     
     m_clients << pSocket;
     qInfo() << "OBS Browser Source connected.";
+    emit clientConnected();
 }
 
 void ObsWebSocketServer::processTextMessage(const QString& message) {

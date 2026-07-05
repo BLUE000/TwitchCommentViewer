@@ -1490,7 +1490,7 @@ void MainWindow::updateObsPhysicsPreview() {
     ui->lblObsPhysicsPreview->setText(QString("サイズプレビュー: [ %1px 〜 %2px ]").arg(minSize).arg(maxSize));
 
     // WebSocket経由で即時ブロードキャスト
-    if (m_controller && m_configManager && ui->comboObsOverlay->currentText() == "physics/index.html") {
+    if (m_controller && m_configManager && ui->comboObsOverlay->currentText().compare("physics/index.html", Qt::CaseInsensitive) == 0) {
         QVariantMap payload;
         payload["minSize"] = minSize;
         payload["maxSize"] = maxSize;

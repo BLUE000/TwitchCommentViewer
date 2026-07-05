@@ -119,6 +119,11 @@ void AppController::initialize() {
 
         if (!m_obsWsIntegration) {
             m_obsWsIntegration = std::make_unique<ObsWebSocketServer>(httpPort + 1, this);
+            connect(m_obsWsIntegration.get(), &ObsWebSocketServer::clientConnected, this, [this]() {
+                if (m_mainWindow) {
+                    QMetaObject::invokeMethod(m_mainWindow, "updateObsPhysicsPreview", Qt::QueuedConnection);
+                }
+            });
         }
     }
 
@@ -649,6 +654,11 @@ void AppController::reloadObsServer() {
         if (!m_obsWsIntegration || m_obsWsIntegration->serverPort() != (httpPort + 1)) {
             m_obsWsIntegration.reset();
             m_obsWsIntegration = std::make_unique<ObsWebSocketServer>(httpPort + 1, this);
+            connect(m_obsWsIntegration.get(), &ObsWebSocketServer::clientConnected, this, [this]() {
+                if (m_mainWindow) {
+                    QMetaObject::invokeMethod(m_mainWindow, "updateObsPhysicsPreview", Qt::QueuedConnection);
+                }
+            });
             qInfo() << "OBS WebSocket Server re-started on port" << (httpPort + 1);
         }
     } else {
