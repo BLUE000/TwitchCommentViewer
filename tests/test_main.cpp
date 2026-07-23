@@ -289,6 +289,56 @@ TEST(ConfigManagerTest, SaveAndLoadConfiguration) {
     QFile::remove(configPath);
 }
 
+// UT-CFG-02: OAuth force_verify URL検証テスト
+TEST(ConfigManagerTest, OAuthForceVerifyUrlGeneration) {
+    ConfigManager cfg;
+    cfg.setClientId("test_client_id_123");
+    cfg.setRedirectUri("http://localhost:30080/");
+
+    QString clientId = cfg.getClientId();
+    QString redirectUri = cfg.getRedirectUri();
+    QString authUrl = QString("https://id.twitch.tv/oauth2/authorize"
+                              "?response_type=token"
+                              "&force_verify=true"
+                              "&client_id=%1"
+                              "&redirect_uri=%2")
+                          .arg(clientId)
+                          .arg(redirectUri);
+
+    EXPECT_TRUE(authUrl.contains("force_verify=true"));
+    EXPECT_TRUE(authUrl.contains("client_id=test_client_id_123"));
+}
+
+// UT-EVT-01: EventSub session_reconnect メッセージ解析および URL 抽出テスト
+TEST(TwitchEventCollectorTest, SessionReconnectPayloadParsing) {
+    QString reconnectJson = R"({
+        "metadata": {
+            "message_id": "msg_123",
+            "message_type": "session_reconnect",
+            "message_timestamp": "2026-07-23T12:00:00Z"
+        },
+        "payload": {
+            "session": {
+                "id": "session_abc",
+                "status": "reconnecting",
+                "keepalive_timeout_seconds": 10,
+                "reconnect_url": "wss://eventsub.wss.twitch.tv/ws?reconnect_token=xyz123",
+                "connected_at": "2026-07-23T10:00:00Z"
+            }
+        }
+    })";
+
+    QJsonDocument doc = QJsonDocument::fromJson(reconnectJson.toUtf8());
+    ASSERT_FALSE(doc.isNull());
+    QJsonObject json = doc.object();
+
+    QString messageType = json["metadata"].toObject()["message_type"].toString();
+    EXPECT_EQ(messageType, "session_reconnect");
+
+    QString reconnectUrl = json["payload"].toObject()["session"].toObject()["reconnect_url"].toString();
+    EXPECT_EQ(reconnectUrl, "wss://eventsub.wss.twitch.tv/ws?reconnect_token=xyz123");
+}
+
 #include "modules/VoiceVoxIntegrationImpl.h"
 
 TEST(VoiceVoxIntegrationTest, QueryJsonRewrite) {

@@ -7,6 +7,9 @@
 
 #include <QHash>
 
+#include <QTimer>
+#include <QUrl>
+
 class TwitchEventCollectorImpl : public QObject, public ITwitchEventCollector {
     Q_OBJECT
 public:
@@ -30,8 +33,11 @@ public:
 
 private slots:
     void onConnected();
+    void onDisconnected();
     void onTextMessageReceived(const QString& message);
     void onErrorOccurred(QAbstractSocket::SocketError error);
+    void onKeepaliveTimeout();
+    void attemptReconnect();
 
 private:
     QWebSocket m_webSocket;
@@ -44,7 +50,16 @@ private:
 
     QHash<QString, QString> m_badgeUrls; // set_id:version -> image_url
 
+    QTimer m_reconnectTimer;
+    QTimer m_keepaliveTimer;
+    int m_reconnectIntervalMs{1000};
+    bool m_isIntentionalDisconnect{false};
+    bool m_isReconnecting{false};
+
     void processNotification(const QJsonObject& json);
+    void handleSessionReconnect(const QJsonObject& json);
+    void resetKeepaliveTimer();
+    void scheduleReconnect();
     void fetchBroadcasterIdAndSubscribe();
     void registerSubscription();
     void sendSubscriptionRequest(const QString& type, const QString& version, const QJsonObject& condition);

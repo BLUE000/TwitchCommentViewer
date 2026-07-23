@@ -15,6 +15,8 @@ add_executable(UnitTests
     test_main.cpp
     ${CMAKE_SOURCE_DIR}/src/modules/DatabaseManager.cpp
     ${CMAKE_SOURCE_DIR}/src/modules/ConfigManager.cpp
+    ${CMAKE_SOURCE_DIR}/src/modules/TwitchEventCollectorImpl.cpp
+    ${CMAKE_SOURCE_DIR}/src/modules/TwitchEventCollectorImpl.h
     ${CMAKE_SOURCE_DIR}/src/modules/VoiceVoxIntegrationImpl.cpp
     ${CMAKE_SOURCE_DIR}/src/modules/VoiceVoxIntegrationImpl.h
     ${CMAKE_SOURCE_DIR}/src/modules/ObsHttpServer.cpp
@@ -35,6 +37,7 @@ target_link_libraries(UnitTests PRIVATE
     Qt6::Gui
     Qt6::Network
     Qt6::Sql
+    Qt6::WebSockets
     TransCipher
 )
 

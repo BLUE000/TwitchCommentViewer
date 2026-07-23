@@ -37,8 +37,11 @@
 各機能は完全に独立したモジュールとして実装する。
 
 #### 外部インターフェースモジュール
-1. **Twitch受信モジュール (`TwitchEventCollector`)**
+1. **Twitch受信モジュール (`TwitchEventCollector` / `TwitchEventCollectorImpl`)**
    - EventSub(WebSocket)からコメントやイベントを受信し、システムに通知する。
+   - **切断検知と自動再接続**: WebSocketの `disconnected` シグナルおよびエラーをハンドリングし、指数バックオフ（Exponential Backoff）を用いた安全な自動再接続ロジックを実装する。
+   - **シームレス移行 (`session_reconnect`)**: Twitchサーバーから送信される `session_reconnect` メッセージに対応し、指定された `reconnect_url` へ新ソケットを開いてコメント途切れなく再接続する。
+   - **Keepalive監視**: Twitchからの `session_keepalive` メッセージ受信用タイマーを運用し、一定時間（例: 15秒）メッセージが途絶えた場合のサイレント切断を検出して自動復旧を行う。
 2. **Twitch送信・操作モジュール (`TwitchActionSender` / `TwitchEventCollectorImpl`)**
    - コントローラからの要求を受け取り、Twitch API(HTTP)を実行してコメント送信、モデレーション操作、ピン留め操作、および**アナウンス送信**を行う。
 3. **OBS連携モジュール (`ObsIntegration` / `ObsHttpServer`)**
@@ -53,6 +56,7 @@
 6. **設定管理モジュール (`ConfigManager`)**
    - 安全なOAuthトークン管理のために、Windows環境ではOSの **DPAPI (Data Protection API)** を使用して資格情報を暗号化。非Windows環境では `TransCipher-Dist` にフォールバックする。
    - アナウンス送信用に新しいOAuthスコープ `moderator:manage:announcements` を含めて認可フローを起動する。
+   - **OAuthアカウント強制選択 (`force_verify=true`)**: 認可URL生成時に `force_verify=true` パラメータを付与し、ブラウザログイン済みの既存セッションに自動接続されるのを防ぎ、ユーザーがいつでも別のアカウントに切り替えて認証できるようにする。
 7. **コメント解析モジュール (`CommentAnalyzer`)**
    - 受信したコメントを解析（形態素解析、感情判定、スパム判定等）し、結果をシステムに非同期で返す。
 

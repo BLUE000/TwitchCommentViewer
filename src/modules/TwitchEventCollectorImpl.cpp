@@ -15,10 +15,17 @@ TwitchEventCollectorImpl::TwitchEventCollectorImpl(QObject* eventTarget, QObject
     : QObject(parent), m_eventTarget(eventTarget)
 {
     connect(&m_webSocket, &QWebSocket::connected, this, &TwitchEventCollectorImpl::onConnected);
+    connect(&m_webSocket, &QWebSocket::disconnected, this, &TwitchEventCollectorImpl::onDisconnected);
     connect(&m_webSocket, &QWebSocket::textMessageReceived, this, &TwitchEventCollectorImpl::onTextMessageReceived);
     // WebSocketのエラー処理
     connect(&m_webSocket, QOverload<QAbstractSocket::SocketError>::of(&QWebSocket::errorOccurred),
             this, &TwitchEventCollectorImpl::onErrorOccurred);
+
+    m_reconnectTimer.setSingleShot(true);
+    connect(&m_reconnectTimer, &QTimer::timeout, this, &TwitchEventCollectorImpl::attemptReconnect);
+
+    m_keepaliveTimer.setSingleShot(true);
+    connect(&m_keepaliveTimer, &QTimer::timeout, this, &TwitchEventCollectorImpl::onKeepaliveTimeout);
 }
 
 TwitchEventCollectorImpl::~TwitchEventCollectorImpl() {
@@ -30,6 +37,8 @@ void TwitchEventCollectorImpl::connectToTwitch() {
         qWarning() << "Cannot connect to Twitch EventSub: Missing Auth Data.";
         return;
     }
+    m_isIntentionalDisconnect = false;
+    m_reconnectTimer.stop();
     // Twitch EventSub WebSockets の接続先URL
     QUrl url("wss://eventsub.wss.twitch.tv/ws");
     qInfo() << "Connecting to Twitch EventSub (WebSocket)...";
@@ -37,6 +46,9 @@ void TwitchEventCollectorImpl::connectToTwitch() {
 }
 
 void TwitchEventCollectorImpl::disconnectFromTwitch() {
+    m_isIntentionalDisconnect = true;
+    m_reconnectTimer.stop();
+    m_keepaliveTimer.stop();
     if (m_webSocket.isValid()) {
         m_webSocket.close();
         qInfo() << "Disconnected from Twitch EventSub.";
@@ -50,11 +62,45 @@ void TwitchEventCollectorImpl::setAuthData(const QString& clientId, const QStrin
 
 void TwitchEventCollectorImpl::onConnected() {
     qInfo() << "Connected to Twitch EventSub. Waiting for session_welcome...";
-    // ここで Session Welcome メッセージを受け取り、
-    // セッションIDを使ってTwitch API(HTTP)にSubscription登録を行う必要があります。
+    resetKeepaliveTimer();
+}
+
+void TwitchEventCollectorImpl::onDisconnected() {
+    m_keepaliveTimer.stop();
+    qWarning() << "WebSocket disconnected from Twitch EventSub.";
+    if (!m_isIntentionalDisconnect) {
+        scheduleReconnect();
+    }
+}
+
+void TwitchEventCollectorImpl::resetKeepaliveTimer() {
+    // EventSub keepalive is received typically within 10s. Set 15s timeout.
+    m_keepaliveTimer.start(15000);
+}
+
+void TwitchEventCollectorImpl::onKeepaliveTimeout() {
+    qWarning() << "Twitch EventSub Keepalive timeout (15s). Connection might be dead. Forcing reconnect...";
+    m_webSocket.abort();
+}
+
+void TwitchEventCollectorImpl::scheduleReconnect() {
+    if (m_reconnectTimer.isActive()) return;
+
+    qInfo() << "Scheduling reconnect in" << m_reconnectIntervalMs << "ms...";
+    m_reconnectTimer.start(m_reconnectIntervalMs);
+
+    // Double interval for exponential backoff (max 30s)
+    m_reconnectIntervalMs = qMin(m_reconnectIntervalMs * 2, 30000);
+}
+
+void TwitchEventCollectorImpl::attemptReconnect() {
+    qInfo() << "Attempting to reconnect to Twitch EventSub...";
+    connectToTwitch();
 }
 
 void TwitchEventCollectorImpl::onTextMessageReceived(const QString& message) {
+    resetKeepaliveTimer();
+
     QJsonDocument doc = QJsonDocument::fromJson(message.toUtf8());
     if (doc.isNull() || !doc.isObject()) return;
 
@@ -67,13 +113,39 @@ void TwitchEventCollectorImpl::onTextMessageReceived(const QString& message) {
         m_sessionId = payload["session"].toObject()["id"].toString();
         qInfo() << "Session Welcome received from Twitch. Session ID:" << m_sessionId;
         
-        // WebSocket接続が確立されたので、APIを使って購読(Subscription)をリクエストする
-        fetchBroadcasterIdAndSubscribe();
+        // 接続成功時は再接続インターバルを初期値にリセット
+        m_reconnectIntervalMs = 1000;
+
+        if (m_isReconnecting) {
+            m_isReconnecting = false;
+            qInfo() << "Session successfully reconnected via session_reconnect URL!";
+        } else {
+            // WebSocket接続が確立されたので、APIを使って購読(Subscription)をリクエストする
+            fetchBroadcasterIdAndSubscribe();
+        }
     } else if (messageType == "notification") {
         processNotification(json);
     } else if (messageType == "session_keepalive") {
-        // qInfo() << "Keepalive received.";
+        // Keepalive タイマーは resetKeepaliveTimer() で更新済み
+    } else if (messageType == "session_reconnect") {
+        handleSessionReconnect(json);
     }
+}
+
+void TwitchEventCollectorImpl::handleSessionReconnect(const QJsonObject& json) {
+    QJsonObject payload = json["payload"].toObject();
+    QString reconnectUrlStr = payload["session"].toObject()["reconnect_url"].toString();
+    if (reconnectUrlStr.isEmpty()) {
+        qWarning() << "Received session_reconnect without reconnect_url!";
+        return;
+    }
+
+    qInfo() << "Received session_reconnect from Twitch. Reconnecting to:" << reconnectUrlStr;
+    m_isReconnecting = true;
+    QUrl reconnectUrl(reconnectUrlStr);
+
+    m_webSocket.close();
+    m_webSocket.open(reconnectUrl);
 }
 
 void TwitchEventCollectorImpl::processNotification(const QJsonObject& json) {

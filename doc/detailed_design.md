@@ -149,6 +149,16 @@
 
 #### `TwitchEventCollectorImpl` (ITwitchEventCollectorの実装クラス)
 * QWebSocket と QNetworkAccessManager を保持し、EventSubの購読およびHelix REST APIを呼び出す。
+* **堅牢性・接続維持仕様**:
+  - **切断検知と自動再接続 (Exponential Backoff)**:
+    - `m_webSocket` の `disconnected` および `errorOccurred` シグナルを検出。
+    - 切断時は再接続タイマー (`QTimer`) を起動し、初回 1秒、2秒、4秒… 最大30秒の指数バックオフ間隔で自動再接続（`connectToTwitch()`）を試みる。
+  - **セッションシームレス移行 (`session_reconnect`)**:
+    - メッセージタイプ `session_reconnect` 受信時、`payload.session.reconnect_url` のURLを取得。
+    - 新しい `QWebSocket` インスタンスを作成して `reconnect_url` へ接続を開始し、`session_welcome` 受信を確認した後に既存ソケットをクローズして切り替える。
+  - **Keepaliveタイムアウト監視**:
+    - `session_keepalive` または任意のメッセージを受信するたびに 15秒タイマー（`m_keepaliveTimer`）を再スタート。
+    - タイマー発火時（Keepalive途絶）はソケットのサイレント断とみなし、ソケットを `abort()` して自動再接続フローへ移行する。
 * **新規API追加点**:
   - `sendAnnouncement(const QString& message, const QString& color)`:
     - エンドポイント: `POST https://api.twitch.tv/helix/chat/announcements?broadcaster_id={broadcaster_id}&moderator_id={moderator_id}`
@@ -157,6 +167,10 @@
 
 ### 4.3 内部処理モジュールクラス
 #### `ConfigManager`
+* `startOAuthFlow()`:
+  - ローカルHTTPサーバー（`http://localhost:30080/`）を起動。
+  - ブラウザでTwitch認可画面を開く。URLには必ず `force_verify=true` パラメータを含めることで、ブラウザに保存された既存セッションでの自動認証を防止し、アカウント切り替え画面を強制表示する。
+    - URL形式: `https://id.twitch.tv/oauth2/authorize?response_type=token&force_verify=true&client_id={m_clientId}&redirect_uri={m_redirectUri}&scope={scopes}`
 * `loadConfig()` / `saveConfig()`: 設定をJSON形式で難読化保存・復元。
   - `activeTtsEngine`: `0` (なし), `1` (棒読みちゃん), `2` (VOICEVOX)
   - 棒読みちゃん用個別設定: Host, Port, Exe, Voice, Volume, Speed, Pitch

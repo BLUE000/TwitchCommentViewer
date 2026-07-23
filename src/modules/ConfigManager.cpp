@@ -259,8 +259,10 @@ void ConfigManager::startOAuthFlow() {
 
     // ブラウザを開いてTwitchの認証画面へ誘導 (Implicit Grant Flow)
     // ※ EventSub のチャット取得には user:read:chat スコープが必須 (空白はURLエンコードが必要)
+    // ※ アカウント切り替えを可能にするため force_verify=true を指定する
     QString authUrl = QString("https://id.twitch.tv/oauth2/authorize"
                               "?response_type=token"
+                              "&force_verify=true"
                               "&client_id=%1"
                               "&redirect_uri=%2"
                               "&scope=user:read:chat%20user:write:chat%20moderator:read:chatters%20moderator:manage:shoutouts%20channel:manage:vips%20channel:manage:moderators%20moderator:manage:banned_users%20moderator:manage:chat_messages%20moderator:manage:announcements")

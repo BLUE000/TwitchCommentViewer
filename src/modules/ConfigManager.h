@@ -18,6 +18,9 @@ public:
     void startOAuthFlow();
     
     QString getClientId() const { return m_clientId; }
+    void setClientId(const QString& id) { m_clientId = id; }
+    QString getRedirectUri() const { return m_redirectUri; }
+    void setRedirectUri(const QString& uri) { m_redirectUri = uri; }
     QString getAccessToken() const { return m_accessToken; }
 
     // TTS共通設定の Getter/Setter
